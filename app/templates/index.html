@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>自动打包管理系统</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <header>
+        <h1>欢迎使用自动打包管理系统</h1>
+    </header>
+    <main>
+        <section>
+            <h2>项目列表</h2>
+            <ul>
+                {% for project in projects %}
+                    <li>
+                        <a href="{{ url_for('project_detail', project_id=project.id) }}">{{ project.name }}</a>
+                    </li>
+                {% else %}
+                    <li>没有可用的项目。</li>
+                {% endfor %}
+            </ul>
+        </section>
+        <section>
+            <h2>操作</h2>
+            <a href="{{ url_for('create_project') }}">创建新项目</a>
+        </section>
+    </main>
+    <footer>
+        <p>&copy; 2023 自动打包管理系统</p>
+    </footer>
+</body>
+</html>

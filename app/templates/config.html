@@ -1,0 +1,254 @@
+{% extends "base.html" %}
+
+{% block title %}全局配置 - Deepin 自动打包工具{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-lg-8">
+        <div class="d-flex align-items-center mb-4">
+            <h2 class="mb-0">
+                <i class="bi bi-gear-fill text-primary me-2"></i>全局配置
+            </h2>
+        </div>
+
+        <div class="card shadow-sm mb-4">
+            <div class="card-body p-4">
+                <form method="POST">
+                    <--list Gerrit 配置 -->
+                    <div class="mb-4">
+                        <h5 class="text-secondary mb-3 pb-2 border-bottom">
+                            <i class="bi bi-git me-2"></i>Gerrit 配置
+                        </h5>
+                        
+                        <div class="mb-3">
+                            <label for="gerrit_url" class="form-label">Gerrit 服务器地址 <span class="text-danger">*</span></label>
+                            <input type="url" 
+                                   class="form-control" 
+                                   id="gerrit_url" 
+                                   name="gerrit_url" 
+                                   value="{{ config.gerrit_url or '' }}"
+                                   placeholder="https://gerrit.uniontech.com"
+                                   required>
+                            <div class="form-text">Gerrit 服务器的完整地址</div>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="ldap_username" class="form-label">LDAP 账号 <span class="text-danger">*</span></label>
+                                <input type="text" 
+                                       class="form-control" 
+                                       id="ldap_username" 
+                                       name="ldap_username" 
+                                       value="{{ config.ldap_username or '' }}"
+                                       placeholder="ut000000"
+                                       required>
+                                <div class="form-text">用于 Gerrit API 认证</div>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label for="ldap_password" class="form-label">
+                                    LDAP 密码 
+                                    {% if config.ldap_password %}
+                                        <span class="badge bg-success">已设置</span>
+                                    {% else %}
+                                        <span class="text-danger">*</span>
+                                    {% endif %}
+                                </label>
+                                <input type="password" 
+                                       class="form-control" 
+                                       id="ldap_password" 
+                                       name="ldap_password" 
+                                       placeholder="{% if config.ldap_password %}留空则不修改{% else %}输入密码{% endif %}"
+                                       {% if not config.ldap_password %}required{% endif %}>
+                                <div class="form-text">
+                                    {% if config.ldap_password %}
+                                        已设置，留空则不修改
+                                    {% else %}
+                                        用于 Gerrit API 认证
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <--list 维护者信息 -->
+                    <div class="mb-4">
+                        <h5 class="text-secondary mb-3 pb-2 border-bottom">
+                            <i class="bi bi-person-fill me-2"></i>维护者信息
+                        </h5>
+                        
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="maintainer_name" class="form-label">维护者姓名</label>
+                                <input type="text" 
+                                       class="form-control" 
+                                       id="maintainer_name" 
+                                       name="maintainer_name" 
+                                       value="{{ config.maintainer_name or '' }}"
+                                       placeholder="张三">
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label for="maintainer_email" class="form-label">维护者邮箱</label>
+                                <input type="email" 
+                                       class="form-control" 
+                                       id="maintainer_email" 
+                                       name="maintainer_email" 
+                                       value="{{ config.maintainer_email or '' }}"
+                                       placeholder="zhangsan@example.com">
+                            </div>
+                        </div>
+                    </div>
+
+                    <--list GitHub 配置（可选） -->
+                    <div class="mb-4">
+                        <h5 class="text-secondary mb-3 pb-2 border-bottom">
+                            <i class="bi bi-github me-2"></i>GitHub 配置（可选）
+                        </h5>
+                        
+                        <div class="mb-3">
+                            <label for="github_token" class="form-label">
+                                GitHub Token 
+                                {% if config.github_token %}
+                                    <span class="badge bg-success">已设置</span>
+                                {% endif %}
+                            </label>
+                            <input type="password" 
+                                   class="form-control font-monospace" 
+                                   id="github_token" 
+                                   name="github_token" 
+                                   placeholder="{% if config.github_token %}留空则不修改{% else %}ghp_xxxxxxxxxxxx{% endif %}">
+                            <div class="form-text">用于 GitHub PR 操作，留空则不修改</div>
+                        </div>
+                    </div>
+
+                    <!-- CRP 配置（可选） -->
+                    <div class="mb-4">
+                        <h5 class="text-secondary mb-3 pb-2 border-bottom">
+                            <i class="bi bi-box-seam me-2"></i>CRP 配置（可选）
+                        </h5>
+                        
+                        <div class="mb-3">
+                            <label for="crp_token" class="form-label">
+                                CRP Token 
+                                {% if config.crp_token %}
+                                    <span class="badge bg-success">已设置</span>
+                                {% endif %}
+                            </label>
+                            <input type="password" 
+                                   class="form-control font-monospace" 
+                                   id="crp_token" 
+                                   name="crp_token" 
+                                   placeholder="{% if config.crp_token %}留空则不修改{% else %}输入 CRP Token{% endif %}">
+                            <div class="form-text">用于 CRP 打包平台操作，留空则不修改</div>
+                        </div>
+                        
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="crp_branch_id" class="form-label">CRP 项目分支ID</label>
+                                <input type="number" 
+                                       class="form-control" 
+                                       id="crp_branch_id" 
+                                       name="crp_branch_id" 
+                                       value="{{ config.crp_branch_id or '' }}"
+                                       placeholder="123">
+                                <div class="form-text">CRP平台的项目分支ID，用于过滤主题</div>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label for="crp_topic_type" class="form-label">CRP 主题类型</label>
+                                <select class="form-select" id="crp_topic_type" name="crp_topic_type">
+                                    <option value="test" {% if config.crp_topic_type == 'test' %}selected{% endif %}>test</option>
+                                    <option value="release" {% if config.crp_topic_type == 'release' %}selected{% endif %}>release</option>
+                                </select>
+                                <div class="form-text">主题类型，通常使用test</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 本地仓库配置 -->
+                    <div class="mb-4">
+                        <h5 class="text-secondary mb-3 pb-2 border-bottom">
+                            <i class="bi bi-folder2 me-2"></i>本地仓库配置
+                        </h5>
+                        
+                        <div class="mb-3">
+                            <label for="local_repos_dir" class="form-label">本地仓库存储目录</label>
+                            <input type="text" 
+                                   class="form-control font-monospace" 
+                                   id="local_repos_dir" 
+                                   name="local_repos_dir" 
+                                   value="{{ config.local_repos_dir or '/tmp/deepin-autopack-repos' }}"
+                                   placeholder="/tmp/deepin-autopack-repos">
+                            <div class="form-text">所有项目仓库将克隆到此目录下</div>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="https_proxy" class="form-label">HTTPS 代理（可选）</label>
+                            <input type="text" 
+                                   class="form-control font-monospace" 
+                                   id="https_proxy" 
+                                   name="https_proxy" 
+                                   value="{{ config.https_proxy or '' }}"
+                                   placeholder="http://127.0.0.1:7890">
+                            <div class="form-text">克隆仓库时使用的代理，例如：http://127.0.0.1:7890</div>
+                        </div>
+                    </div>
+
+                    <--list 按钮组 -->
+                    <div class="d-flex justify-content-end gap-2 mt-4 pt-3 border-top">
+                        <button type="submit" class="btn btn-primary">
+                            <i class="bi bi-check-circle me-1"></i>保存配置
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <--list 测试连接卡片 -->
+        <div class="card shadow-sm">
+            <div class="card-header bg-light">
+                <h5 class="mb-0">
+                    <i class="bi bi-lightning-charge text-warning me-2"></i>测试连接
+                </h5>
+            </div>
+            <div class="card-body">
+                <p class="text-muted mb-3">
+                    保存配置后，可以测试 Gerrit 连接是否正常
+                </p>
+                
+                <form method="POST" action="{{ url_for('config.test_gerrit') }}">
+                    <div class="input-group">
+                        <span class="input-group-text">
+                            <i class="bi bi-folder"></i>
+                        </span>
+                        <input type="text" 
+                               class="form-control" 
+                               name="test_project" 
+                               placeholder="输入项目名称测试，例如：deepin-music"
+                               value="deepin-music">
+                        <button type="submit" class="btn btn-outline-primary" {% if not config.ldap_username or not config.ldap_password %}disabled{% endif %}>
+                            <i class="bi bi-play-circle me-1"></i>测试 Gerrit 连接
+                        </button>
+                    </div>
+                    {% if not config.ldap_username or not config.ldap_password %}
+                    <div class="form-text text-danger">
+                        <i class="bi bi-exclamation-triangle me-1"></i>请先保存 LDAP 账号和密码
+                    </div>
+                    {% endif %}
+                </form>
+            </div>
+        </div>
+
+        <--list 配置说明 -->
+        <div class="alert alert-info mt-4" role="alert">
+            <h6 class="alert-heading">
+                <i class="bi bi-info-circle me-2"></i>配置说明
+            </h6>
+            <ul class="mb-0 small">
+                <li><strong>Gerrit 配置</strong>：必填，用于查询提交信息和检测代码同步状态</li>
+                <li><strong>维护者信息</strong>：可选，用于打包时的联系人信息</li>
+                <li><strong>GitHub Token</strong>：可选，后续用于创建和监控 PR</li>
+                <li><strong>CRP Token</strong>：可选，后续用于触发和监控打包任务</li>
+            </ul>
+        </div>
+    </div>
+</div>
+{% endblock %}

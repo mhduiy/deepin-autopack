@@ -1,0 +1,226 @@
+{% extends "base.html" %}
+
+{% block title %}提交监控 - Deepin 自动打包工具{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2 class="mb-0">
+        <i class="bi bi-activity text-primary me-2"></i>提交监控
+    </h2>
+    <button class="btn btn-primary" onclick="refreshAllProjects()">
+        <i class="bi bi-arrow-clockwise me-1"></i>刷新所有项目
+    </button>
+</div>
+
+{% if projects %}
+<div class="row g-4">
+    {% for project_info in projects %}
+    <div class="col-12">
+        <div class="card shadow-sm">
+            <div class="card-header bg-light">
+                <div class="d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">
+                        <i class="bi bi-folder2-open text-primary me-2"></i>
+                        {{ project_info.project.name }}
+                    </h5>
+                    <div>
+                        <button class="btn btn-sm btn-outline-primary me-2" 
+                                onclick="refreshProject({{ project_info.project.id }})"
+                                id="refresh-btn-{{ project_info.project.id }}">
+                            <i class="bi bi-arrow-clockwise me-1"></i>刷新
+                        </button>
+                        <button class="btn btn-sm btn-success" disabled>
+                            <i class="bi bi-box-seam me-1"></i>打包
+                        </button>
+                    </div>
+                </div>
+            </div>
+            <div class="card-body">
+                <div class="row mb-3">
+                    <div class="col-md-3">
+                        <small class="text-muted d-block mb-1">当前版本</small>
+                        <div class="fs-5 fw-bold text-primary" id="version-{{ project_info.project.id }}">
+                            {% if project_info.current_version %}
+                                {{ project_info.current_version }}
+                            {% else %}
+                                <span class="text-muted">未知</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <small class="text-muted d-block mb-1">最新 Tag</small>
+                        <div class="fs-5 fw-bold text-info" id="tag-{{ project_info.project.id }}">
+                            {% if project_info.latest_tag %}
+                                <i class="bi bi-tag me-1"></i>{{ project_info.latest_tag }}
+                            {% else %}
+                                <span class="text-muted">无 Tag</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <small class="text-muted d-block mb-1">
+                            新增提交
+                            {% if project_info.since_type == 'changelog' %}
+                                <span class="badge bg-info text-white" style="font-size: 0.7rem;">基于 changelog</span>
+                            {% elif project_info.since_type == 'tag' %}
+                                <span class="badge bg-secondary" style="font-size: 0.7rem;">基于 tag</span>
+                            {% endif %}
+                        </small>
+                        <div class="fs-5 fw-bold" id="commit-count-{{ project_info.project.id }}">
+                            {% if project_info.new_commits_count > 0 %}
+                                <span class="text-success">
+                                    <i class="bi bi-plus-circle me-1"></i>{{ project_info.new_commits_count }} 个
+                                </span>
+                            {% else %}
+                                <span class="text-muted">0 个</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <small class="text-muted d-block mb-1">最新提交</small>
+                        <div class="fs-6" id="latest-commit-{{ project_info.project.id }}">
+                            {% if project_info.latest_commit %}
+                                <span class="badge bg-secondary font-monospace">{{ project_info.latest_commit.hash }}</span>
+                                <br>
+                                <small class="text-muted">{{ project_info.latest_commit.date }}</small>
+                            {% else %}
+                                <span class="text-muted">-</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+
+                {% if project_info.new_commits and project_info.new_commits|length > 0 %}
+                <div class="mt-3">
+                    <button class="btn btn-sm btn-outline-secondary" 
+                            type="button" 
+                            data-bs-toggle="collapse" 
+                            data-bs-target="#commits-{{ project_info.project.id }}">
+                        <i class="bi bi-list-ul me-1"></i>查看提交列表 ({{ project_info.new_commits|length }})
+                    </button>
+                    <div class="collapse mt-3" id="commits-{{ project_info.project.id }}">
+                        <div class="list-group list-group-flush" style="max-height: 400px; overflow-y: auto;">
+                            {% for commit in project_info.new_commits %}
+                            <div class="list-group-item px-0">
+                                <div class="d-flex justify-content-between align-items-start">
+                                    <div class="flex-grow-1">
+                                        <div class="mb-1">
+                                            <span class="badge bg-dark font-monospace me-2">{{ commit.hash }}</span>
+                                            <span>{{ commit.message }}</span>
+                                        </div>
+                                        <small class="text-muted">
+                                            <i class="bi bi-person me-1"></i>{{ commit.author }}
+                                            <i class="bi bi-clock ms-3 me-1"></i>{{ commit.date }}
+                                        </small>
+                                    </div>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+
+{% else %}
+<div class="text-center py-5">
+    <i class="bi bi-inbox display-1 text-muted"></i>
+    <h4 class="mt-3 text-muted">暂无就绪的项目</h4>
+    <p class="text-muted">请先在项目列表中克隆仓库</p>
+    <a href="{{ url_for('project.project_list') }}" class="btn btn-primary mt-3">
+        <i class="bi bi-arrow-left me-1"></i>返回项目列表
+    </a>
+</div>
+{% endif %}
+
+<script>
+// 刷新单个项目
+async function refreshProject(projectId) {
+    const btn = document.getElementById(`refresh-btn-${projectId}`);
+    const originalHtml = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>刷新中...';
+    
+    try {
+        const response = await fetch(`/monitor/projects/${projectId}/refresh`, {
+            method: 'POST'
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            // 更新页面数据
+            if (result.data.current_version) {
+                document.getElementById(`version-${projectId}`).innerHTML = result.data.current_version;
+            }
+            if (result.data.latest_tag) {
+                document.getElementById(`tag-${projectId}`).innerHTML = 
+                    `<i class="bi bi-tag me-1"></i>${result.data.latest_tag}`;
+            }
+            if (result.data.new_commits_count !== undefined) {
+                const countEl = document.getElementById(`commit-count-${projectId}`);
+                if (result.data.new_commits_count > 0) {
+                    countEl.innerHTML = 
+                        `<span class="text-success"><i class="bi bi-plus-circle me-1"></i>${result.data.new_commits_count} 个</span>`;
+                } else {
+                    countEl.innerHTML = '<span class="text-muted">0 个</span>';
+                }
+            }
+            if (result.data.latest_commit) {
+                document.getElementById(`latest-commit-${projectId}`).innerHTML = 
+                    `<span class="badge bg-secondary font-monospace">${result.data.latest_commit.hash}</span><br>` +
+                    `<small class="text-muted">${result.data.latest_commit.date}</small>`;
+            }
+            
+            // 刷新页面以更新提交列表
+            setTimeout(() => location.reload(), 500);
+        } else {
+            alert('刷新失败: ' + result.message);
+        }
+    } catch (error) {
+        console.error('刷新失败:', error);
+        alert('刷新失败: ' + error.message);
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = originalHtml;
+    }
+}
+
+// 刷新所有项目
+async function refreshAllProjects() {
+    if (!confirm('确定要刷新所有项目吗？这可能需要一些时间。')) {
+        return;
+    }
+    
+    const btn = event.target;
+    const originalHtml = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>刷新中...';
+    
+    try {
+        const response = await fetch('/monitor/refresh-all', {
+            method: 'POST'
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            alert(`刷新完成！成功: ${result.data.success_count}, 失败: ${result.data.failed_count}`);
+            location.reload();
+        } else {
+            alert('刷新失败: ' + result.message);
+        }
+    } catch (error) {
+        console.error('刷新失败:', error);
+        alert('刷新失败: ' + error.message);
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = originalHtml;
+    }
+}
+</script>
+{% endblock %}

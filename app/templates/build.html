@@ -1,0 +1,482 @@
+{% extends "base.html" %}
+
+{% block title %}打包任务{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2 class="mb-0">
+            <i class="bi bi-list-task"></i> 打包任务
+        </h2>
+        <div>
+            <button class="btn btn-outline-primary me-2" onclick="refreshTasks()">
+                <i class="bi bi-arrow-clockwise"></i> 刷新
+            </button>
+            <button class="btn btn-primary">
+                <i class="bi bi-plus-circle"></i> 新建任务
+            </button>
+        </div>
+    </div>
+
+    <--list 加载提示 -->
+    <div id="loading" class="text-center py-5" style="display: none;">
+        <div class="spinner-border text-primary" role="status">
+            <span class="visually-hidden">加载中...</span>
+        </div>
+        <p class="mt-3 text-muted">正在加载任务列表...</p>
+    </div>
+
+    <--list 任务列表 -->
+    <div id="tasks-container">
+        <--list 任务卡片将在这里动态生成 -->
+    </div>
+
+    <--list 空状态 -->
+    <div id="empty-state" class="text-center py-5" style="display: none;">
+        <i class="bi bi-inbox" style="font-size: 4rem; color: #ccc;"></i>
+        <p class="mt-3 text-muted">暂无打包任务</p>
+        <button class="btn btn-primary mt-2">
+            <i class="bi bi-plus-circle"></i> 创建第一个任务
+        </button>
+    </div>
+</div>
+
+<style>
+.task-card {
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+    margin-bottom: 1.5rem;
+    padding: 1.5rem;
+    transition: all 0.3s ease;
+}
+
+.task-card:hover {
+    box-shadow: 0 4px 16px rgba(0,0,0,0.12);
+    transform: translateY(-2px);
+}
+
+.task-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1rem;
+    padding-bottom: 1rem;
+    border-bottom: 2px solid #f0f0f0;
+}
+
+.task-title {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.task-project-name {
+    font-size: 1.25rem;
+    font-weight: 600;
+    color: #2c3e50;
+    margin: 0;
+}
+
+.task-version {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    padding: 0.25rem 0.75rem;
+    border-radius: 20px;
+    font-size: 0.875rem;
+    font-weight: 500;
+}
+
+.task-status-badge {
+    padding: 0.5rem 1rem;
+    border-radius: 8px;
+    font-weight: 600;
+    font-size: 0.875rem;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.status-running {
+    background: #fff3cd;
+    color: #856404;
+}
+
+.status-success {
+    background: #d1e7dd;
+    color: #0f5132;
+}
+
+.status-failed {
+    background: #f8d7da;
+    color: #842029;
+}
+
+.status-paused {
+    background: #e2e3e5;
+    color: #41464b;
+}
+
+/* 步骤进度条 */
+.steps-container {
+    margin: 1.5rem 0;
+}
+
+.step-progress {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    position: relative;
+    margin-bottom: 1rem;
+}
+
+.step-item {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    position: relative;
+    z-index: 1;
+}
+
+.step-icon {
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.25rem;
+    font-weight: bold;
+    position: relative;
+    background: white;
+    border: 3px solid #e0e0e0;
+    color: #999;
+    transition: all 0.3s ease;
+}
+
+.step-item.completed .step-icon {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border-color: #667eea;
+    color: white;
+}
+
+.step-item.running .step-icon {
+    background: #ffc107;
+    border-color: #ffc107;
+    color: white;
+    animation: pulse 2s infinite;
+}
+
+.step-item.failed .step-icon {
+    background: #dc3545;
+    border-color: #dc3545;
+    color: white;
+}
+
+.step-item.paused .step-icon {
+    background: #6c757d;
+    border-color: #6c757d;
+    color: white;
+}
+
+@keyframes pulse {
+    0%, 100% {
+        box-shadow: 0 0 0 0 rgba(255, 193, 7, 0.7);
+    }
+    50% {
+        box-shadow: 0 0 0 10px rgba(255, 193, 7, 0);
+    }
+}
+
+.step-label {
+    margin-top: 0.5rem;
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: #666;
+    text-align: center;
+}
+
+.step-item.completed .step-label {
+    color: #667eea;
+}
+
+.step-item.running .step-label {
+    color: #ffc107;
+}
+
+.step-item.failed .step-label {
+    color: #dc3545;
+}
+
+.step-time {
+    margin-top: 0.25rem;
+    font-size: 0.75rem;
+    color: #999;
+    text-align: center;
+}
+
+/* 步骤之间的连接线 */
+.step-line {
+    position: absolute;
+    top: 24px;
+    left: 0;
+    right: 0;
+    height: 3px;
+    background: #e0e0e0;
+    z-index: 0;
+}
+
+.step-line-progress {
+    position: absolute;
+    top: 0;
+    left: 0;
+    height: 100%;
+    background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+    transition: width 0.5s ease;
+}
+
+/* 任务信息 */
+.task-info {
+    display: flex;
+    gap: 2rem;
+    margin-top: 1rem;
+    padding-top: 1rem;
+    border-top: 1px solid #f0f0f0;
+    font-size: 0.875rem;
+    color: #666;
+}
+
+.task-info-item {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.task-actions {
+    display: flex;
+    gap: 0.5rem;
+    margin-top: 1rem;
+}
+
+.error-message {
+    background: #f8d7da;
+    border: 1px solid #f5c2c7;
+    border-radius: 8px;
+    padding: 1rem;
+    margin-top: 1rem;
+    color: #842029;
+    display: flex;
+    align-items: start;
+    gap: 0.75rem;
+}
+
+.error-message i {
+    font-size: 1.25rem;
+    margin-top: 0.125rem;
+}
+
+.spinner-dot {
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    from {
+        transform: rotate(0deg);
+    }
+    to {
+        transform: rotate(360deg);
+    }
+}
+</style>
+
+<script>
+// 页面加载时获取任务列表
+document.addEventListener('DOMContentLoaded', function() {
+    loadTasks();
+    
+    // 每5秒自动刷新
+    setInterval(loadTasks, 5000);
+});
+
+async function loadTasks() {
+    const loading = document.getElementById('loading');
+    const container = document.getElementById('tasks-container');
+    const emptyState = document.getElementById('empty-state');
+
+    try {
+        const response = await fetch('/api/tasks');
+        const result = await response.json();
+
+        if (!result.success) {
+            return;
+        }
+
+        const tasks = result.data;
+
+        if (!tasks || tasks.length === 0) {
+            container.innerHTML = '';
+            emptyState.style.display = 'block';
+            return;
+        }
+
+        emptyState.style.display = 'none';
+        
+        // 渲染任务列表
+        container.innerHTML = '';
+        tasks.forEach(task => {
+            const card = createTaskCard(task);
+            container.appendChild(card);
+        });
+
+    } catch (err) {
+        console.error('加载任务列表失败:', err);
+    }
+}
+
+function createTaskCard(task) {
+    const card = document.createElement('div');
+    card.className = 'task-card';
+
+    // 计算进度百分比
+    const completedSteps = task.steps.filter(s => s.status === 'completed').length;
+    const progressPercent = (completedSteps / task.steps.length) * 100;
+
+    // 状态图标和文本
+    const statusConfig = {
+        'running': {icon: 'bi-arrow-repeat', text: '进行中', class: 'status-running'},
+        'success': {icon: 'bi-check-circle-fill', text: '已完成', class: 'status-success'},
+        'failed': {icon: 'bi-x-circle-fill', text: '失败', class: 'status-failed'},
+        'paused': {icon: 'bi-pause-circle-fill', text: '已暂停', class: 'status-paused'}
+    };
+
+    const status = statusConfig[task.status] || statusConfig.running;
+
+    card.innerHTML = `
+        <div class="task-header">
+            <div class="task-title">
+                <h5 class="task-project-name">${task.project_name}</h5>
+                <span class="task-version">v${task.version}</span>
+            </div>
+            <div class="task-status-badge ${status.class}">
+                <i class="bi ${status.icon} ${task.status === 'running' ? 'spinner-dot' : ''}"></i>
+                ${status.text}
+            </div>
+        </div>
+
+        <div class="steps-container">
+            <div class="step-progress">
+                <div class="step-line">
+                    <div class="step-line-progress" style="width: ${progressPercent}%"></div>
+                </div>
+                ${task.steps.map((step, index) => createStepItem(step, index)).join('')}
+            </div>
+        </div>
+
+        ${task.error ? `
+            <div class="error-message">
+                <i class="bi bi-exclamation-triangle-fill"></i>
+                <div>
+                    <strong>错误信息：</strong><br>
+                    ${task.error}
+                </div>
+            </div>
+        ` : ''}
+
+        <div class="task-info">
+            <div class="task-info-item">
+                <i class="bi bi-clock"></i>
+                创建时间: ${task.created_at}
+            </div>
+            <div class="task-info-item">
+                <i class="bi bi-clock-history"></i>
+                更新时间: ${task.updated_at}
+            </div>
+            <div class="task-info-item">
+                <i class="bi bi-hash"></i>
+                任务ID: #${task.id}
+            </div>
+        </div>
+
+        <div class="task-actions">
+            <button class="btn btn-sm btn-outline-primary" onclick="viewTaskDetail(${task.id})">
+                <i class="bi bi-eye"></i> 查看详情
+            </button>
+            ${task.status === 'failed' ? `
+                <button class="btn btn-sm btn-outline-success" onclick="retryTask(${task.id})">
+                    <i class="bi bi-arrow-clockwise"></i> 重试
+                </button>
+            ` : ''}
+            ${task.status === 'running' ? `
+                <button class="btn btn-sm btn-outline-warning" onclick="pauseTask(${task.id})">
+                    <i class="bi bi-pause"></i> 暂停
+                </button>
+            ` : ''}
+            ${task.status === 'paused' ? `
+                <button class="btn btn-sm btn-outline-success" onclick="resumeTask(${task.id})">
+                    <i class="bi bi-play"></i> 继续
+                </button>
+            ` : ''}
+            ${task.status !== 'success' ? `
+                <button class="btn btn-sm btn-outline-danger" onclick="cancelTask(${task.id})">
+                    <i class="bi bi-x-circle"></i> 取消
+                </button>
+            ` : ''}
+        </div>
+    `;
+
+    return card;
+}
+
+function createStepItem(step, index) {
+    const icons = ['bi-cloud-download', 'bi-tag', 'bi-git', 'bi-box-seam', 'bi-check-circle'];
+    const icon = icons[index] || 'bi-circle';
+    
+    return `
+        <div class="step-item ${step.status}">
+            <div class="step-icon">
+                ${step.status === 'completed' ? '<i class="bi bi-check"></i>' : 
+                  step.status === 'running' ? '<i class="bi bi-arrow-repeat spinner-dot"></i>' : 
+                  step.status === 'failed' ? '<i class="bi bi-x"></i>' :
+                  step.status === 'paused' ? '<i class="bi bi-pause"></i>' :
+                  `<i class="bi ${icon}"></i>`}
+            </div>
+            <div class="step-label">${step.name}</div>
+            ${step.time ? `<div class="step-time">${step.time}</div>` : ''}
+        </div>
+    `;
+}
+
+function refreshTasks() {
+    loadTasks();
+}
+
+function viewTaskDetail(taskId) {
+    alert(`查看任务详情 #${taskId}\n（功能待实现）`);
+}
+
+function retryTask(taskId) {
+    if (confirm(`确定要重试任务 #${taskId} 吗？`)) {
+        alert(`重试任务 #${taskId}\n（功能待实现）`);
+    }
+}
+
+function pauseTask(taskId) {
+    if (confirm(`确定要暂停任务 #${taskId} 吗？`)) {
+        alert(`暂停任务 #${taskId}\n（功能待实现）`);
+    }
+}
+
+function resumeTask(taskId) {
+    if (confirm(`确定要继续任务 #${taskId} 吗？`)) {
+        alert(`继续任务 #${taskId}\n（功能待实现）`);
+    }
+}
+
+function cancelTask(taskId) {
+    if (confirm(`确定要取消任务 #${taskId} 吗？\n此操作不可恢复。`)) {
+        alert(`取消任务 #${taskId}\n（功能待实现）`);
+    }
+}
+</script>
+{% endblock %}

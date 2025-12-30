@@ -1,0 +1,138 @@
+{% extends "base.html" %}
+
+{% block title %}{{ '编辑项目' if project else '新建项目' }} - Deepin 自动打包工具{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-lg-8">
+        <div class="d-flex align-items-center mb-4">
+            <a href="{{ url_for('project.project_list') }}" class="btn btn-outline-secondary me-3">
+                <i class="bi bi-arrow-left"></i>
+            </a>
+            <h2 class="mb-0">
+                <i class="bi bi-{{ 'pencil-square' if project else 'plus-square' }} text-primary me-2"></i>
+                {{ '编辑项目' if project else '新建项目' }}
+            </h2>
+        </div>
+
+        <div class="card shadow-sm">
+            <div class="card-body p-4">
+                <form method="POST">
+                    <!-- 项目名 -->
+                    <div class="mb-4">
+                        <label for="name" class="form-label">
+                            项目名 <span class="text-danger">*</span>
+                        </label>
+                        <input type="text" 
+                               class="form-control form-control-lg" 
+                               id="name" 
+                               name="name" 
+                               value="{{ project.name if project else '' }}"
+                               placeholder="例如：deepin-music"
+                               required>
+                        <div class="form-text">项目的唯一标识名称</div>
+                    </div>
+
+                    <!-- Gerrit 配置 -->
+                    <div class="mb-3">
+                        <h5 class="text-secondary mb-3">
+                            <i class="bi bi-git me-2"></i>Gerrit 配置
+                        </h5>
+                    </div>
+
+                    <div class="row mb-3">
+                        <div class="col-md-8">
+                            <label for="gerrit_url" class="form-label">Gerrit 地址</label>
+                            <input type="url" 
+                                   class="form-control" 
+                                   id="gerrit_url" 
+                                   name="gerrit_url" 
+                                   value="{{ project.gerrit_url if project else '' }}"
+                                   placeholder="https://gerrit.example.com/project">
+                            <div class="form-text">Gerrit 浏览器地址（用于查看）</div>
+                        </div>
+                        <div class="col-md-4">
+                            <label for="gerrit_branch" class="form-label">Gerrit 分支</label>
+                            <input type="text" 
+                                   class="form-control" 
+                                   id="gerrit_branch" 
+                                   name="gerrit_branch" 
+                                   value="{{ project.gerrit_branch if project else '' }}"
+                                   placeholder="master">
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="gerrit_repo_url" class="form-label">Gerrit 仓库地址（可选）</label>
+                        <input type="url" 
+                               class="form-control font-monospace" 
+                               id="gerrit_repo_url" 
+                               name="gerrit_repo_url" 
+                               value="{{ project.gerrit_repo_url if project else '' }}"
+                               placeholder="https://gerrit.example.com/project 或 ssh://user@gerrit.example.com:29418/project">
+                        <div class="form-text">用于克隆的 Gerrit 仓库地址。如果不填，将使用 GitHub 地址克隆</div>
+                    </div>
+
+                    <!-- GitHub 配置 -->
+                    <div class="mb-3 mt-4">
+                        <h5 class="text-secondary mb-3">
+                            <i class="bi bi-github me-2"></i>GitHub 配置
+                        </h5>
+                    </div>
+
+                    <div class="row mb-3">
+                        <div class="col-md-8">
+                            <label for="github_url" class="form-label">GitHub 地址</label>
+                            <input type="url" 
+                                   class="form-control" 
+                                   id="github_url" 
+                                   name="github_url" 
+                                   value="{{ project.github_url if project else '' }}"
+                                   placeholder="https://github.com/owner/repo">
+                        </div>
+                        <div class="col-md-4">
+                            <label for="github_branch" class="form-label">GitHub 分支</label>
+                            <input type="text" 
+                                   class="form-control" 
+                                   id="github_branch" 
+                                   name="github_branch" 
+                                   value="{{ project.github_branch if project else '' }}"
+                                   placeholder="main">
+                        </div>
+                    </div>
+
+                    <!-- 打包信息 -->
+                    <div class="mb-3 mt-4">
+                        <h5 class="text-secondary mb-3">
+                            <i class="bi bi-box-seam me-2"></i>打包信息
+                        </h5>
+                    </div>
+
+                    <div class="mb-4">
+                        <label for="last_commit_hash" class="form-label">上一次打包 Commit Hash</label>
+                        <input type="text" 
+                               class="form-control font-monospace" 
+                               id="last_commit_hash" 
+                               name="last_commit_hash" 
+                               value="{{ project.last_commit_hash if project else '' }}"
+                               placeholder="例如：a1b2c3d4e5f6g7h8i9j0"
+                               maxlength="40">
+                        <div class="form-text">用于追踪自上次打包以来的新提交</div>
+                    </div>
+
+                    <!-- 按钮组 -->
+                    <div class="d-flex justify-content-end gap-2 mt-4 pt-3 border-top">
+                        <a href="{{ url_for('project.project_list') }}" class="btn btn-outline-secondary">
+                            <i class="bi bi-x-circle me-1"></i>取消
+                        </a>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="bi bi-check-circle me-1"></i>
+                            {{ '保存修改' if project else '创建项目' }}
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
