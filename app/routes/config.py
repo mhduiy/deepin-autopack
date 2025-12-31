@@ -1,4 +1,4 @@
-from flask import Blueprint, render_template, request, redirect, url_for, flash
+from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify
 from app import db
 from app.models import GlobalConfig
 
@@ -49,12 +49,17 @@ def global_config():
 
 @config_bp.route('/test-gerrit', methods=['POST'])
 def test_gerrit():
-    """测试 Gerrit 连接"""
+    """测试 Gerrit 连接（JSON API）"""
     from app.services.gerrit_service import create_gerrit_service
     
     config = GlobalConfig.get_config()
     
+    # 检查是否是JSON请求
+    is_json = request.is_json or request.headers.get('Content-Type') == 'application/x-www-form-urlencoded'
+    
     if not config.ldap_username or not config.ldap_password or not config.gerrit_url:
+        if is_json:
+            return jsonify({'success': False, 'message': '请先配置 LDAP 账号和 Gerrit 地址'}), 400
         flash('请先配置 LDAP 账号和 Gerrit 地址', 'warning')
         return redirect(url_for('config.global_config'))
     
@@ -73,10 +78,82 @@ def test_gerrit():
         result = gerrit.get_project_info(test_project)
         
         if result['success']:
-            flash(f'Gerrit 连接测试成功！项目 {test_project} 信息获取成功。', 'success')
+            return jsonify({'success': True, 'message': f'项目 {test_project} 连接成功'})
         else:
-            flash(f'Gerrit 连接失败: {result["message"]}', 'danger')
+            return jsonify({'success': False, 'message': result.get('message', '连接失败')})
     except Exception as e:
-        flash(f'测试出错: {str(e)}', 'danger')
+        return jsonify({'success': False, 'message': f'测试出错: {str(e)}'})
+
+@config_bp.route('/test-crp', methods=['POST'])
+def test_crp():
+    """测试 CRP 连接（JSON API）"""
+    from app.services.crp_service import CRPService
     
-    return redirect(url_for('config.global_config'))
+    config = GlobalConfig.get_config()
+    
+    if not config.ldap_username or not config.ldap_password or not config.crp_token:
+        return jsonify({'success': False, 'message': '请先配置 LDAP 账号和 CRP Token'}), 400
+    
+    try:
+        # 创建 CRP 服务
+        crp = CRPService(config.crp_token)
+        
+        # 测试 API 调用 - 获取主题列表
+        topics = crp.get_topics()
+        
+        if topics:
+            return jsonify({'success': True, 'message': f'CRP 连接成功，找到 {len(topics)} 个主题'})
+        else:
+            return jsonify({'success': False, 'message': 'CRP Token 可能无效或已过期'})
+    except Exception as e:
+        return jsonify({'success': False, 'message': f'测试出错: {str(e)}'})
+
+@config_bp.route('/refresh-crp-token', methods=['POST'])
+def refresh_crp_token():
+    """刷新 CRP Token"""
+    import subprocess
+    import os
+    
+    config = GlobalConfig.get_config()
+    
+    if not config.ldap_username or not config.ldap_password:
+        return jsonify({'success': False, 'message': '请先配置 LDAP 账号和密码'}), 400
+    
+    try:
+        # 查找刷新脚本
+        script_path = os.path.expanduser('~/Dev/dev-tool/gen_pwd.py')
+        if not os.path.exists(script_path):
+            # 尝试其他可能的路径
+            alt_paths = [
+                os.path.expanduser('~/Dev/dev-tool/gen_pwd'),
+                os.path.expanduser('~/Dev/dev-tool/gen_token.py'),
+                os.path.expanduser('~/Dev/dev-tool/refresh_token.py'),
+            ]
+            for path in alt_paths:
+                if os.path.exists(path):
+                    script_path = path
+                    break
+            else:
+                return jsonify({'success': False, 'message': '未找到刷新脚本，请检查 ~/Dev/dev-tool/ 目录'})
+        
+        # 执行脚本刷新token
+        result = subprocess.run(
+            ['python3', script_path, config.ldap_username, config.ldap_password],
+            capture_output=True,
+            text=True,
+            timeout=30
+        )
+        
+        if result.returncode == 0 and result.stdout:
+            # 假设脚本输出的是新token
+            new_token = result.stdout.strip()
+            config.crp_token = new_token
+            db.session.commit()
+            return jsonify({'success': True, 'message': 'Token 刷新成功'})
+        else:
+            error_msg = result.stderr if result.stderr else '脚本执行失败'
+            return jsonify({'success': False, 'message': error_msg})
+    except subprocess.TimeoutExpired:
+        return jsonify({'success': False, 'message': '刷新超时，请稍后重试'})
+    except Exception as e:
+        return jsonify({'success': False, 'message': f'刷新失败: {str(e)}'})

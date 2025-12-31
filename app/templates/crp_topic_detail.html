@@ -1,291 +1,442 @@
 {% extends "base.html" %}
 
-{% block title %}主题详情{% endblock %}
+{% block title %}主题详情 - {{ topic.name }} - Deepin 自动打包工具{% endblock %}
 
 {% block content %}
-<div class="container-fluid py-4">
-    <!-- 头部 -->
-    <div class="d-flex justify-content-between align-items-center mb-4">
-        <div>
-            <a href="/topics" class="btn btn-outline-secondary mb-2">
-                <i class="bi bi-arrow-left"></i> 返回主题列表
-            </a>
-            <h2 class="mb-0">
-                <i class="bi bi-archive-fill"></i> 主题详情
-                <small class="text-muted" id="topic-name"></small>
+<div class="mb-4">
+    <a href="{{ url_for('crp.topics') }}" class="btn btn-outline-secondary btn-sm mb-3">
+        <i class="bi bi-arrow-left"></i> 返回主题列表
+    </a>
+    
+    <div class="topic-header">
+        <div class="topic-header-content">
+            <h2 class="mb-2">
+                <i class="bi bi-layers-fill text-primary me-2"></i>{{ topic.name }}
             </h2>
-        </div>
-        <button class="btn btn-primary" onclick="refreshReleases()">
-            <i class="bi bi-arrow-clockwise"></i> 刷新
-        </button>
-    </div>
-
-    <!-- 加载提示 -->
-    <div id="loading" class="text-center py-5" style="display: none;">
-        <div class="spinner-border text-primary" role="status">
-            <span class="visually-hidden">加载中...</span>
-        </div>
-        <p class="mt-3 text-muted">正在加载包列表...</p>
-    </div>
-
-    <!-- 错误提示 -->
-    <div id="error-alert" class="alert alert-danger" role="alert" style="display: none;">
-        <i class="bi bi-exclamation-triangle-fill"></i>
-        <span id="error-message"></span>
-    </div>
-
-    <!-- 包列表表格 -->
-    <div id="releases-container" style="display: none;">
-        <div class="card shadow-sm">
-            <div class="card-body">
-                <div class="table-responsive">
-                    <table class="table table-hover align-middle">
-                        <thead class="table-light">
-                            <tr>
-                                <th>包名</th>
-                                <th>源包名</th>
-                                <th>分支</th>
-                                <th>版本</th>
-                                <th>Commit</th>
-                                <th>架构</th>
-                                <th>构建状态</th>
-                                <th>操作</th>
-                            </tr>
-                        </thead>
-                        <tbody id="releases-tbody">
-                            <!-- 包列表将在这里动态生成 -->
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- 空状态 -->
-    <div id="empty-state" class="text-center py-5" style="display: none;">
-        <i class="bi bi-inbox" style="font-size: 4rem; color: #ccc;"></i>
-        <p class="mt-3 text-muted">该主题下暂无包</p>
-    </div>
-</div>
-
-<!-- 确认删除模态框 -->
-<div class="modal fade" id="confirmDeleteModal" tabindex="-1">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title">确认放弃</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-            </div>
-            <div class="modal-body">
-                <p>确定要放弃以下包吗？</p>
-                <p class="text-danger" id="delete-package-name"></p>
-                <p class="text-muted">此操作不可恢复</p>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
-                <button type="button" class="btn btn-danger" onclick="confirmDelete()">
-                    <i class="bi bi-trash"></i> 确认放弃
-                </button>
+            <p class="text-muted mb-3">{{ topic.description }}</p>
+            <div class="topic-meta">
+                <span class="meta-badge">
+                    <i class="bi bi-calendar3"></i> {{ topic.create_time }}
+                </span>
+                <span class="meta-badge">
+                    <i class="bi bi-person-fill"></i> {{ topic.creator_name }}
+                </span>
             </div>
         </div>
     </div>
 </div>
+
+<div class="table-container">
+    <table class="modern-table">
+        <thead>
+            <tr>
+                <th><i class="bi bi-box-seam"></i> 包名</th>
+                <th><i class="bi bi-diagram-3"></i> 分支</th>
+                <th><i class="bi bi-tag"></i> 标签</th>
+                <th><i class="bi bi-hash"></i> Commit</th>
+                <th><i class="bi bi-cpu"></i> 架构</th>
+                <th><i class="bi bi-activity"></i> 构建状态</th>
+                <th class="text-center"><i class="bi bi-gear"></i> 操作</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for release in releases %}
+            <tr>
+                <td>
+                    <div class="package-cell">
+                        <strong>{{ release.project_name }}</strong>
+                        {% if release.project_name != release.source_pkg_name %}
+                        <small class="text-muted d-block">
+                            <i class="bi bi-arrow-return-right"></i> {{ release.source_pkg_name }}
+                        </small>
+                        {% endif %}
+                    </div>
+                </td>
+                <td>
+                    <span class="badge-modern badge-branch">{{ release.branch }}</span>
+                </td>
+                <td>
+                    <span class="badge-modern badge-tag">{{ release.tag }}</span>
+                </td>
+                <td>
+                    <code class="commit-hash">{{ release.commit[:10] if release.commit else 'N/A' }}</code>
+                </td>
+                <td>
+                    <span class="badge-modern badge-arch">{{ release.arches }}</span>
+                </td>
+                <td>
+                    {% if release.build_state == 'SUCCESS' %}
+                        <span class="status-badge status-success">
+                            <i class="bi bi-check-circle-fill"></i> 成功
+                        </span>
+                    {% elif release.build_state == 'FAILED' %}
+                        <span class="status-badge status-failed">
+                            <i class="bi bi-x-circle-fill"></i> 失败
+                        </span>
+                    {% elif release.build_state == 'BUILDING' %}
+                        <span class="status-badge status-building">
+                            <span class="spinner-border spinner-border-sm me-1"></span> 构建中
+                        </span>
+                    {% elif release.build_state == 'PENDING' %}
+                        <span class="status-badge status-pending">
+                            <i class="bi bi-clock-fill"></i> 待构建
+                        </span>
+                    {% else %}
+                        <span class="status-badge status-unknown">
+                            <i class="bi bi-question-circle-fill"></i> {{ release.build_state }}
+                        </span>
+                    {% endif %}
+                </td>
+                <td class="text-center">
+                    <div class="btn-group" role="group">
+                        <button class="btn btn-sm btn-info-modern" 
+                                onclick="viewDetails({{ release.build_id }})"
+                                title="查看详情">
+                            <i class="bi bi-eye"></i>
+                        </button>
+                        <button class="btn btn-sm btn-warning-modern" 
+                                onclick="retryBuild({{ release.id }}, '{{ release.project_name }}')"
+                                title="重试构建">
+                            <i class="bi bi-arrow-clockwise"></i>
+                        </button>
+                        <button class="btn btn-sm btn-danger-modern" 
+                                onclick="abandonRelease({{ release.id }}, '{{ release.project_name }}')"
+                                title="放弃打包">
+                            <i class="bi bi-trash"></i>
+                        </button>
+                    </div>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+{% if not releases %}
+<div class="text-center py-5">
+    <i class="bi bi-inbox" style="font-size: 4rem; color: #ccc;"></i>
+    <p class="mt-3 text-muted">该主题下暂无包</p>
+</div>
+{% endif %}
 
 <style>
-.badge {
+.topic-header {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border-radius: 16px;
+    padding: 2rem;
+    box-shadow: 0 4px 16px rgba(102, 126, 234, 0.3);
+    margin-bottom: 2rem;
+}
+
+.topic-header-content h2 {
+    color: white;
+    font-weight: 700;
+}
+
+.topic-header-content p {
+    color: rgba(255, 255, 255, 0.9);
+    font-size: 1.1rem;
+    margin-bottom: 0;
+}
+
+.topic-meta {
+    display: flex;
+    gap: 1rem;
+    flex-wrap: wrap;
+}
+
+.meta-badge {
+    background: rgba(255, 255, 255, 0.2);
+    backdrop-filter: blur(10px);
+    color: white;
+    padding: 0.375rem 0.875rem;
+    border-radius: 8px;
     font-size: 0.875rem;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+/* 现代化表格样式 */
+.table-container {
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+    overflow: hidden;
+}
+
+.modern-table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+    font-size: 0.95rem;
+}
+
+.modern-table thead {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+}
+
+.modern-table thead th {
+    padding: 1rem;
+    text-align: left;
+    font-weight: 600;
+    font-size: 0.875rem;
+    letter-spacing: 0.5px;
+    border: none;
+    white-space: nowrap;
+}
+
+.modern-table thead th i {
+    margin-right: 0.5rem;
+    opacity: 0.9;
+}
+
+.modern-table tbody tr {
+    border-bottom: 1px solid #f0f0f0;
+    transition: all 0.2s ease;
+}
+
+.modern-table tbody tr:hover {
+    background: #f8f9fe;
+    transform: scale(1.01);
+    box-shadow: 0 2px 8px rgba(102, 126, 234, 0.1);
+}
+
+.modern-table tbody tr:last-child {
+    border-bottom: none;
+}
+
+.modern-table tbody td {
+    padding: 1rem;
+    vertical-align: middle;
+    border: none;
+}
+
+.package-cell strong {
+    color: #2c3e50;
+    font-size: 1rem;
+}
+
+.package-cell small {
+    font-size: 0.85rem;
+    margin-top: 0.25rem;
+}
+
+.badge-modern {
     padding: 0.375rem 0.75rem;
+    border-radius: 6px;
+    font-weight: 500;
+    font-size: 0.875rem;
+    display: inline-block;
+}
+
+.badge-branch {
+    background: #e3f2fd;
+    color: #1976d2;
+    border: 1px solid #bbdefb;
+}
+
+.badge-tag {
+    background: #f3e5f5;
+    color: #7b1fa2;
+    border: 1px solid #e1bee7;
+}
+
+.badge-arch {
+    background: #e8f5e9;
+    color: #388e3c;
+    border: 1px solid #c8e6c9;
 }
 
 .commit-hash {
+    background: #f5f5f5;
+    color: #616161;
+    padding: 0.375rem 0.625rem;
+    border-radius: 6px;
     font-family: 'Courier New', monospace;
     font-size: 0.875rem;
-    background-color: #f8f9fa;
-    padding: 0.25rem 0.5rem;
-    border-radius: 0.25rem;
+    border: 1px solid #e0e0e0;
 }
 
-.btn-view-build {
+.status-badge {
+    padding: 0.5rem 0.875rem;
+    border-radius: 8px;
+    font-weight: 600;
     font-size: 0.875rem;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    white-space: nowrap;
 }
 
-.arch-list {
-    font-size: 0.875rem;
-    color: #6c757d;
+.status-success {
+    background: #d1e7dd;
+    color: #0f5132;
+    border: 1px solid #badbcc;
+}
+
+.status-failed {
+    background: #f8d7da;
+    color: #842029;
+    border: 1px solid #f5c2c7;
+}
+
+.status-building {
+    background: #cfe2ff;
+    color: #084298;
+    border: 1px solid #b6d4fe;
+}
+
+.status-pending {
+    background: #fff3cd;
+    color: #856404;
+    border: 1px solid #ffecb5;
+}
+
+.status-unknown {
+    background: #e2e3e5;
+    color: #41464b;
+    border: 1px solid #d3d3d4;
+}
+
+.btn-group {
+    display: inline-flex;
+    gap: 0.25rem;
+}
+
+.btn-info-modern {
+    background: linear-gradient(135deg, #3b82f6, #2563eb);
+    color: white;
+    border: none;
+    padding: 0.5rem 0.875rem;
+    border-radius: 6px;
+    transition: all 0.2s ease;
+    font-weight: 500;
+}
+
+.btn-info-modern:hover {
+    background: linear-gradient(135deg, #2563eb, #1d4ed8);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);
+    color: white;
+}
+
+.btn-warning-modern {
+    background: linear-gradient(135deg, #f59e0b, #d97706);
+    color: white;
+    border: none;
+    padding: 0.5rem 0.875rem;
+    border-radius: 6px;
+    transition: all 0.2s ease;
+    font-weight: 500;
+}
+
+.btn-warning-modern:hover {
+    background: linear-gradient(135deg, #d97706, #b45309);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(217, 119, 6, 0.3);
+    color: white;
+}
+
+.btn-danger-modern {
+    background: linear-gradient(135deg, #ff6b6b, #ee5a6f);
+    color: white;
+    border: none;
+    padding: 0.5rem 0.875rem;
+    border-radius: 6px;
+    transition: all 0.2s ease;
+    font-weight: 500;
+}
+
+.btn-danger-modern:hover {
+    background: linear-gradient(135deg, #ff5252, #e64a64);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(238, 90, 111, 0.3);
+    color: white;
+}
+
+.spinner-border-sm {
+    width: 0.875rem;
+    height: 0.875rem;
+    border-width: 0.15em;
+}
+
+/* 响应式优化 */
+@media (max-width: 1200px) {
+    .modern-table {
+        font-size: 0.875rem;
+    }
+    
+    .modern-table thead th,
+    .modern-table tbody td {
+        padding: 0.75rem;
+    }
+}
+
+@media (max-width: 768px) {
+    .table-container {
+        overflow-x: auto;
+    }
+    
+    .modern-table {
+        min-width: 800px;
+    }
 }
 </style>
 
 <script>
-const topicId = {{ topic_id }};
-let deleteReleaseId = null;
-let deletePackageName = null;
-
-// 页面加载时获取包列表
-document.addEventListener('DOMContentLoaded', function() {
-    loadReleases();
-});
-
-async function loadReleases() {
-    const loading = document.getElementById('loading');
-    const error = document.getElementById('error-alert');
-    const container = document.getElementById('releases-container');
-    const tbody = document.getElementById('releases-tbody');
-    const emptyState = document.getElementById('empty-state');
-
-    // 显示加载状态
-    loading.style.display = 'block';
-    error.style.display = 'none';
-    container.style.display = 'none';
-    emptyState.style.display = 'none';
-    tbody.innerHTML = '';
-
-    try {
-        const response = await fetch(`/api/topics/${topicId}/releases`);
-        const result = await response.json();
-
-        loading.style.display = 'none';
-
-        if (!result.success) {
-            showError(result.message);
-            return;
-        }
-
-        const releases = result.data;
-
-        if (!releases || releases.length === 0) {
-            emptyState.style.display = 'block';
-            return;
-        }
-
-        // 渲染包列表
-        container.style.display = 'block';
-        releases.forEach(release => {
-            const row = createReleaseRow(release);
-            tbody.appendChild(row);
-        });
-
-    } catch (err) {
-        loading.style.display = 'none';
-        showError('加载包列表失败: ' + err.message);
+function viewDetails(buildId) {
+    if (!buildId || buildId === 0) {
+        alert('该包尚未开始构建');
+        return;
     }
+    // 跳转到Shuttle构建详情页面
+    window.open(`https://shuttle.uniontech.com/builds/${buildId}`, '_blank');
 }
 
-function createReleaseRow(release) {
-    const tr = document.createElement('tr');
-
-    const projectName = release.project_name || '-';
-    const sourcePkgName = release.source_pkg_name || '-';
-    const branch = release.branch || '-';
-    const tag = release.tag || '-';
-    const commit = release.commit ? release.commit.substring(0, 8) : '-';
-    const arches = release.arches || '-';
-    const buildId = release.build_id || 0;
-    const stateLabel = release.state_label || '未知';
-    const stateBadgeClass = release.state_badge_class || 'bg-secondary';
-
-    // 构建查看详情链接
-    const buildLink = buildId > 0 
-        ? `https://shuttle.uniontech.com/#/tasks/task?taskid=${buildId}`
-        : '#';
-
-    tr.innerHTML = `
-        <td>${projectName}</td>
-        <td><code>${sourcePkgName}</code></td>
-        <td>${branch}</td>
-        <td><strong>${tag}</strong></td>
-        <td><span class="commit-hash">${commit}</span></td>
-        <td><span class="arch-list">${arches}</span></td>
-        <td>
-            <span class="badge ${stateBadgeClass}">${stateLabel}</span>
-        </td>
-        <td>
-            ${buildId > 0 ? `
-                <a href="${buildLink}" target="_blank" class="btn btn-sm btn-outline-primary btn-view-build me-1">
-                    <i class="bi bi-box-arrow-up-right"></i> 查看
-                </a>
-            ` : ''}
-            <button class="btn btn-sm btn-outline-danger" onclick="showDeleteConfirm(${release.id}, '${projectName}')">
-                <i class="bi bi-trash"></i> 放弃
-            </button>
-        </td>
-    `;
-
-    return tr;
-}
-
-function showDeleteConfirm(releaseId, packageName) {
-    deleteReleaseId = releaseId;
-    deletePackageName = packageName;
-    document.getElementById('delete-package-name').textContent = packageName;
+function retryBuild(releaseId, projectName) {
+    if (!confirm(`确定要重试构建 ${projectName} 吗？`)) {
+        return;
+    }
     
-    const modal = new bootstrap.Modal(document.getElementById('confirmDeleteModal'));
-    modal.show();
-}
-
-async function confirmDelete() {
-    if (!deleteReleaseId) return;
-
-    try {
-        const response = await fetch(`/api/releases/${deleteReleaseId}`, {
-            method: 'DELETE'
-        });
-        const result = await response.json();
-
-        // 关闭模态框
-        const modal = bootstrap.Modal.getInstance(document.getElementById('confirmDeleteModal'));
-        modal.hide();
-
-        if (result.success) {
-            // 显示成功提示
-            showSuccess('已成功放弃包: ' + deletePackageName);
-            // 刷新列表
-            setTimeout(() => loadReleases(), 1000);
+    fetch(`/crp/api/releases/${releaseId}/retry`, {
+        method: 'POST'
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert('已触发重新构建');
+            location.reload();
         } else {
-            showError(result.message);
+            alert('操作失败: ' + data.message);
         }
+    })
+    .catch(err => {
+        alert('请求失败: ' + err);
+    });
+}
 
-        deleteReleaseId = null;
-        deletePackageName = null;
-
-    } catch (err) {
-        showError('放弃包失败: ' + err.message);
+function abandonRelease(releaseId, projectName) {
+    if (!confirm(`确定要放弃打包 ${projectName} 吗？`)) {
+        return;
     }
-}
-
-function refreshReleases() {
-    loadReleases();
-}
-
-function showError(message) {
-    const error = document.getElementById('error-alert');
-    const errorMessage = document.getElementById('error-message');
-    errorMessage.textContent = message;
-    error.style.display = 'block';
     
-    // 3秒后自动隐藏
-    setTimeout(() => {
-        error.style.display = 'none';
-    }, 5000);
-}
-
-function showSuccess(message) {
-    const alertDiv = document.createElement('div');
-    alertDiv.className = 'alert alert-success alert-dismissible fade show';
-    alertDiv.style.position = 'fixed';
-    alertDiv.style.top = '20px';
-    alertDiv.style.right = '20px';
-    alertDiv.style.zIndex = '9999';
-    alertDiv.innerHTML = `
-        <i class="bi bi-check-circle-fill"></i>
-        ${message}
-        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-    `;
-    document.body.appendChild(alertDiv);
-    
-    // 3秒后自动移除
-    setTimeout(() => {
-        alertDiv.remove();
-    }, 3000);
+    fetch(`/crp/api/releases/${releaseId}`, {
+        method: 'DELETE'
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert('放弃打包成功');
+            location.reload();
+        } else {
+            alert('操作失败: ' + data.message);
+        }
+    })
+    .catch(err => {
+        alert('请求失败: ' + err);
+    });
 }
 </script>
 {% endblock %}

@@ -3,252 +3,536 @@
 {% block title %}全局配置 - Deepin 自动打包工具{% endblock %}
 
 {% block content %}
-<div class="row justify-content-center">
-    <div class="col-lg-8">
-        <div class="d-flex align-items-center mb-4">
-            <h2 class="mb-0">
-                <i class="bi bi-gear-fill text-primary me-2"></i>全局配置
-            </h2>
-        </div>
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2 class="mb-0">
+        <i class="bi bi-gear-fill text-primary me-2"></i>全局配置
+    </h2>
+</div>
 
-        <div class="card shadow-sm mb-4">
-            <div class="card-body p-4">
-                <form method="POST">
-                    <--list Gerrit 配置 -->
-                    <div class="mb-4">
-                        <h5 class="text-secondary mb-3 pb-2 border-bottom">
-                            <i class="bi bi-git me-2"></i>Gerrit 配置
-                        </h5>
-                        
-                        <div class="mb-3">
-                            <label for="gerrit_url" class="form-label">Gerrit 服务器地址 <span class="text-danger">*</span></label>
-                            <input type="url" 
+<form method="POST">
+    <div class="row g-4">
+        <!-- 左侧配置区域 -->
+        <div class="col-lg-8">
+            <!-- LDAP账号配置 -->
+            <div class="config-card mb-4">
+                <div class="config-header">
+                    <div class="config-header-icon ldap-icon">
+                        <i class="bi bi-shield-lock-fill"></i>
+                    </div>
+                    <div>
+                        <h5 class="mb-1">LDAP 账号配置</h5>
+                        <small class="text-muted">用于访问内网打包平台（Gerrit、CRP等）</small>
+                    </div>
+                </div>
+                <div class="config-body">
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label for="ldap_username" class="form-label">
+                                <i class="bi bi-person-badge me-1"></i>LDAP 账号
+                                <span class="text-danger">*</span>
+                            </label>
+                            <input type="text" 
                                    class="form-control" 
-                                   id="gerrit_url" 
-                                   name="gerrit_url" 
-                                   value="{{ config.gerrit_url or '' }}"
-                                   placeholder="https://gerrit.uniontech.com"
+                                   id="ldap_username" 
+                                   name="ldap_username" 
+                                   value="{{ config.ldap_username or '' }}"
+                                   placeholder="ut000000"
                                    required>
-                            <div class="form-text">Gerrit 服务器的完整地址</div>
                         </div>
-
-                        <div class="row">
-                            <div class="col-md-6 mb-3">
-                                <label for="ldap_username" class="form-label">LDAP 账号 <span class="text-danger">*</span></label>
-                                <input type="text" 
-                                       class="form-control" 
-                                       id="ldap_username" 
-                                       name="ldap_username" 
-                                       value="{{ config.ldap_username or '' }}"
-                                       placeholder="ut000000"
-                                       required>
-                                <div class="form-text">用于 Gerrit API 认证</div>
-                            </div>
-                            <div class="col-md-6 mb-3">
-                                <label for="ldap_password" class="form-label">
-                                    LDAP 密码 
-                                    {% if config.ldap_password %}
-                                        <span class="badge bg-success">已设置</span>
-                                    {% else %}
-                                        <span class="text-danger">*</span>
-                                    {% endif %}
-                                </label>
-                                <input type="password" 
-                                       class="form-control" 
-                                       id="ldap_password" 
-                                       name="ldap_password" 
-                                       placeholder="{% if config.ldap_password %}留空则不修改{% else %}输入密码{% endif %}"
-                                       {% if not config.ldap_password %}required{% endif %}>
-                                <div class="form-text">
-                                    {% if config.ldap_password %}
-                                        已设置，留空则不修改
-                                    {% else %}
-                                        用于 Gerrit API 认证
-                                    {% endif %}
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <--list 维护者信息 -->
-                    <div class="mb-4">
-                        <h5 class="text-secondary mb-3 pb-2 border-bottom">
-                            <i class="bi bi-person-fill me-2"></i>维护者信息
-                        </h5>
-                        
-                        <div class="row">
-                            <div class="col-md-6 mb-3">
-                                <label for="maintainer_name" class="form-label">维护者姓名</label>
-                                <input type="text" 
-                                       class="form-control" 
-                                       id="maintainer_name" 
-                                       name="maintainer_name" 
-                                       value="{{ config.maintainer_name or '' }}"
-                                       placeholder="张三">
-                            </div>
-                            <div class="col-md-6 mb-3">
-                                <label for="maintainer_email" class="form-label">维护者邮箱</label>
-                                <input type="email" 
-                                       class="form-control" 
-                                       id="maintainer_email" 
-                                       name="maintainer_email" 
-                                       value="{{ config.maintainer_email or '' }}"
-                                       placeholder="zhangsan@example.com">
-                            </div>
-                        </div>
-                    </div>
-
-                    <--list GitHub 配置（可选） -->
-                    <div class="mb-4">
-                        <h5 class="text-secondary mb-3 pb-2 border-bottom">
-                            <i class="bi bi-github me-2"></i>GitHub 配置（可选）
-                        </h5>
-                        
-                        <div class="mb-3">
-                            <label for="github_token" class="form-label">
-                                GitHub Token 
-                                {% if config.github_token %}
-                                    <span class="badge bg-success">已设置</span>
+                        <div class="col-md-6">
+                            <label for="ldap_password" class="form-label">
+                                <i class="bi bi-key-fill me-1"></i>LDAP 密码
+                                {% if config.ldap_password %}
+                                    <span class="badge bg-success ms-2">已设置</span>
+                                {% else %}
+                                    <span class="text-danger">*</span>
                                 {% endif %}
                             </label>
                             <input type="password" 
-                                   class="form-control font-monospace" 
-                                   id="github_token" 
-                                   name="github_token" 
-                                   placeholder="{% if config.github_token %}留空则不修改{% else %}ghp_xxxxxxxxxxxx{% endif %}">
-                            <div class="form-text">用于 GitHub PR 操作，留空则不修改</div>
+                                   class="form-control" 
+                                   id="ldap_password" 
+                                   name="ldap_password" 
+                                   placeholder="{% if config.ldap_password %}留空则不修改{% else %}输入密码{% endif %}"
+                                   {% if not config.ldap_password %}required{% endif %}>
+                            {% if config.ldap_password %}
+                            <small class="form-text text-muted">已设置，留空则不修改</small>
+                            {% endif %}
                         </div>
                     </div>
+                </div>
+            </div>
 
-                    <!-- CRP 配置（可选） -->
-                    <div class="mb-4">
-                        <h5 class="text-secondary mb-3 pb-2 border-bottom">
-                            <i class="bi bi-box-seam me-2"></i>CRP 配置（可选）
-                        </h5>
-                        
-                        <div class="mb-3">
-                            <label for="crp_token" class="form-label">
-                                CRP Token 
-                                {% if config.crp_token %}
-                                    <span class="badge bg-success">已设置</span>
-                                {% endif %}
+            <!-- 维护者信息 -->
+            <div class="config-card mb-4">
+                <div class="config-header">
+                    <div class="config-header-icon maintainer-icon">
+                        <i class="bi bi-person-fill"></i>
+                    </div>
+                    <div>
+                        <h5 class="mb-1">维护者信息</h5>
+                        <small class="text-muted">用于填写 changelog 和打包联系信息</small>
+                    </div>
+                </div>
+                <div class="config-body">
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label for="maintainer_name" class="form-label">
+                                <i class="bi bi-person me-1"></i>维护者姓名
                             </label>
-                            <input type="password" 
-                                   class="form-control font-monospace" 
-                                   id="crp_token" 
-                                   name="crp_token" 
-                                   placeholder="{% if config.crp_token %}留空则不修改{% else %}输入 CRP Token{% endif %}">
-                            <div class="form-text">用于 CRP 打包平台操作，留空则不修改</div>
-                        </div>
-                        
-                        <div class="row">
-                            <div class="col-md-6 mb-3">
-                                <label for="crp_branch_id" class="form-label">CRP 项目分支ID</label>
-                                <input type="number" 
-                                       class="form-control" 
-                                       id="crp_branch_id" 
-                                       name="crp_branch_id" 
-                                       value="{{ config.crp_branch_id or '' }}"
-                                       placeholder="123">
-                                <div class="form-text">CRP平台的项目分支ID，用于过滤主题</div>
-                            </div>
-                            <div class="col-md-6 mb-3">
-                                <label for="crp_topic_type" class="form-label">CRP 主题类型</label>
-                                <select class="form-select" id="crp_topic_type" name="crp_topic_type">
-                                    <option value="test" {% if config.crp_topic_type == 'test' %}selected{% endif %}>test</option>
-                                    <option value="release" {% if config.crp_topic_type == 'release' %}selected{% endif %}>release</option>
-                                </select>
-                                <div class="form-text">主题类型，通常使用test</div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- 本地仓库配置 -->
-                    <div class="mb-4">
-                        <h5 class="text-secondary mb-3 pb-2 border-bottom">
-                            <i class="bi bi-folder2 me-2"></i>本地仓库配置
-                        </h5>
-                        
-                        <div class="mb-3">
-                            <label for="local_repos_dir" class="form-label">本地仓库存储目录</label>
                             <input type="text" 
-                                   class="form-control font-monospace" 
-                                   id="local_repos_dir" 
-                                   name="local_repos_dir" 
-                                   value="{{ config.local_repos_dir or '/tmp/deepin-autopack-repos' }}"
-                                   placeholder="/tmp/deepin-autopack-repos">
-                            <div class="form-text">所有项目仓库将克隆到此目录下</div>
+                                   class="form-control" 
+                                   id="maintainer_name" 
+                                   name="maintainer_name" 
+                                   value="{{ config.maintainer_name or '' }}"
+                                   placeholder="张三">
                         </div>
-                        
-                        <div class="mb-3">
-                            <label for="https_proxy" class="form-label">HTTPS 代理（可选）</label>
-                            <input type="text" 
-                                   class="form-control font-monospace" 
-                                   id="https_proxy" 
-                                   name="https_proxy" 
-                                   value="{{ config.https_proxy or '' }}"
-                                   placeholder="http://127.0.0.1:7890">
-                            <div class="form-text">克隆仓库时使用的代理，例如：http://127.0.0.1:7890</div>
+                        <div class="col-md-6">
+                            <label for="maintainer_email" class="form-label">
+                                <i class="bi bi-envelope me-1"></i>维护者邮箱
+                            </label>
+                            <input type="email" 
+                                   class="form-control" 
+                                   id="maintainer_email" 
+                                   name="maintainer_email" 
+                                   value="{{ config.maintainer_email or '' }}"
+                                   placeholder="zhangsan@example.com">
                         </div>
                     </div>
+                </div>
+            </div>
 
-                    <--list 按钮组 -->
-                    <div class="d-flex justify-content-end gap-2 mt-4 pt-3 border-top">
-                        <button type="submit" class="btn btn-primary">
-                            <i class="bi bi-check-circle me-1"></i>保存配置
-                        </button>
+            <!-- GitHub配置 -->
+            <div class="config-card mb-4">
+                <div class="config-header">
+                    <div class="config-header-icon github-icon">
+                        <i class="bi bi-github"></i>
                     </div>
-                </form>
+                    <div>
+                        <h5 class="mb-1">GitHub 配置</h5>
+                        <small class="text-muted">用于 GitHub PR 操作和仓库访问</small>
+                    </div>
+                </div>
+                <div class="config-body">
+                    <div class="mb-0">
+                        <label for="github_token" class="form-label">
+                            <i class="bi bi-key me-1"></i>GitHub Token
+                            {% if config.github_token %}
+                                <span class="badge bg-success ms-2">已设置</span>
+                            {% endif %}
+                        </label>
+                        <input type="password" 
+                               class="form-control font-monospace" 
+                               id="github_token" 
+                               name="github_token" 
+                               placeholder="{% if config.github_token %}留空则不修改{% else %}ghp_xxxxxxxxxxxx{% endif %}">
+                        <small class="form-text text-muted">用于 GitHub API 访问，留空则不修改</small>
+                    </div>
+                </div>
+            </div>
+
+            <!-- CRP配置 -->
+            <div class="config-card mb-4">
+                <div class="config-header">
+                    <div class="config-header-icon crp-icon">
+                        <i class="bi bi-box-seam"></i>
+                    </div>
+                    <div class="flex-grow-1">
+                        <h5 class="mb-1">CRP 打包平台配置</h5>
+                        <small class="text-muted">Commit Review Package 自动打包系统</small>
+                    </div>
+                    <button type="button" class="btn btn-sm btn-outline-primary" onclick="refreshCRPToken()" id="refreshCRPBtn">
+                        <i class="bi bi-arrow-clockwise me-1"></i>刷新 Token
+                    </button>
+                </div>
+                <div class="config-body">
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label for="crp_branch_id" class="form-label">
+                                <i class="bi bi-diagram-3 me-1"></i>分支 ID
+                            </label>
+                            <input type="number" 
+                                   class="form-control" 
+                                   id="crp_branch_id" 
+                                   name="crp_branch_id" 
+                                   value="{{ config.crp_branch_id or '' }}"
+                                   placeholder="例如: 123">
+                            <small class="form-text text-muted">CRP 平台的项目分支 ID</small>
+                        </div>
+                        <div class="col-md-6">
+                            <label for="crp_topic_type" class="form-label">
+                                <i class="bi bi-tag me-1"></i>主题类型
+                            </label>
+                            <input type="text" 
+                                   class="form-control" 
+                                   id="crp_topic_type" 
+                                   name="crp_topic_type" 
+                                   value="test"
+                                   disabled
+                                   readonly>
+                            <small class="form-text text-muted">主题类型固定为 test</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 本地配置 -->
+            <div class="config-card mb-4">
+                <div class="config-header">
+                    <div class="config-header-icon local-icon">
+                        <i class="bi bi-hdd"></i>
+                    </div>
+                    <div>
+                        <h5 class="mb-1">本地环境配置</h5>
+                        <small class="text-muted">仓库存储路径和网络代理设置</small>
+                    </div>
+                </div>
+                <div class="config-body">
+                    <div class="mb-3">
+                        <label for="local_repos_dir" class="form-label">
+                            <i class="bi bi-folder2-open me-1"></i>本地仓库目录
+                        </label>
+                        <input type="text" 
+                               class="form-control font-monospace" 
+                               id="local_repos_dir" 
+                               name="local_repos_dir" 
+                               value="{{ config.local_repos_dir or '' }}"
+                               placeholder="~/.cache/deepin-autopack/repo">
+                        <small class="form-text text-muted">默认: ~/.cache/deepin-autopack/repo</small>
+                    </div>
+                    <div class="mb-0">
+                        <label for="https_proxy" class="form-label">
+                            <i class="bi bi-globe me-1"></i>HTTPS 代理
+                        </label>
+                        <input type="text" 
+                               class="form-control font-monospace" 
+                               id="https_proxy" 
+                               name="https_proxy" 
+                               value="{{ config.https_proxy or '' }}"
+                               placeholder="http://127.0.0.1:7890">
+                        <small class="form-text text-muted">用于克隆 GitHub 仓库，例如: http://127.0.0.1:7890</small>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 保存按钮 -->
+            <div class="d-flex justify-content-end mb-4">
+                <button type="submit" class="btn btn-primary btn-lg">
+                    <i class="bi bi-check-circle me-2"></i>保存配置
+                </button>
             </div>
         </div>
 
-        <--list 测试连接卡片 -->
-        <div class="card shadow-sm">
-            <div class="card-header bg-light">
-                <h5 class="mb-0">
-                    <i class="bi bi-lightning-charge text-warning me-2"></i>测试连接
-                </h5>
-            </div>
-            <div class="card-body">
-                <p class="text-muted mb-3">
-                    保存配置后，可以测试 Gerrit 连接是否正常
-                </p>
-                
-                <form method="POST" action="{{ url_for('config.test_gerrit') }}">
-                    <div class="input-group">
-                        <span class="input-group-text">
-                            <i class="bi bi-folder"></i>
-                        </span>
-                        <input type="text" 
-                               class="form-control" 
-                               name="test_project" 
-                               placeholder="输入项目名称测试，例如：deepin-music"
-                               value="deepin-music">
-                        <button type="submit" class="btn btn-outline-primary" {% if not config.ldap_username or not config.ldap_password %}disabled{% endif %}>
+        <!-- 右侧测试区域 -->
+        <div class="col-lg-4">
+            <!-- 连接测试 -->
+            <div class="config-card sticky-top" style="top: 1rem;">
+                <div class="config-header">
+                    <div class="config-header-icon test-icon">
+                        <i class="bi bi-lightning-charge-fill"></i>
+                    </div>
+                    <div>
+                        <h5 class="mb-1">连接测试</h5>
+                        <small class="text-muted">验证各平台配置是否正确</small>
+                    </div>
+                </div>
+                <div class="config-body">
+                    <!-- CRP连接测试 -->
+                    <div class="test-item mb-3">
+                        <div class="d-flex align-items-center mb-2">
+                            <i class="bi bi-box-seam text-primary me-2"></i>
+                            <strong>CRP 平台</strong>
+                        </div>
+                        <button type="button" 
+                                class="btn btn-outline-primary btn-sm w-100" 
+                                onclick="testCRPConnection()"
+                                {% if not config.ldap_username or not config.ldap_password %}disabled{% endif %}>
+                            <i class="bi bi-play-circle me-1"></i>测试 CRP 连接
+                        </button>
+                        <div id="crpTestResult" class="test-result mt-2"></div>
+                    </div>
+
+                    <hr class="my-3">
+
+                    <!-- GitHub连接测试 -->
+                    <div class="test-item mb-3">
+                        <div class="d-flex align-items-center mb-2">
+                            <i class="bi bi-github text-dark me-2"></i>
+                            <strong>GitHub</strong>
+                        </div>
+                        <button type="button" 
+                                class="btn btn-outline-dark btn-sm w-100" 
+                                onclick="testGitHubConnection()">
+                            <i class="bi bi-play-circle me-1"></i>测试 GitHub 可访问性
+                        </button>
+                        <div id="githubTestResult" class="test-result mt-2"></div>
+                    </div>
+
+                    <hr class="my-3">
+
+                    <!-- GitHub Token测试 -->
+                    <div class="test-item mb-3">
+                        <div class="d-flex align-items-center mb-2">
+                            <i class="bi bi-key text-secondary me-2"></i>
+                            <strong>GitHub Token</strong>
+                        </div>
+                        <button type="button" 
+                                class="btn btn-outline-secondary btn-sm w-100" 
+                                disabled
+                                title="即将上线">
+                            <i class="bi bi-lock me-1"></i>测试 Token 有效性
+                        </button>
+                        <div class="test-result mt-2">
+                            <small class="text-muted"><i class="bi bi-info-circle me-1"></i>即将上线</small>
+                        </div>
+                    </div>
+
+                    <hr class="my-3">
+
+                    <!-- Gerrit连接测试 -->
+                    <div class="test-item mb-0">
+                        <div class="d-flex align-items-center mb-2">
+                            <i class="bi bi-git text-danger me-2"></i>
+                            <strong>Gerrit</strong>
+                        </div>
+                        <div class="input-group input-group-sm mb-2">
+                            <span class="input-group-text">
+                                <i class="bi bi-folder"></i>
+                            </span>
+                            <input type="text" 
+                                   class="form-control" 
+                                   id="gerritTestProject"
+                                   placeholder="项目名"
+                                   value="deepin-music">
+                        </div>
+                        <button type="button" 
+                                class="btn btn-outline-danger btn-sm w-100" 
+                                onclick="testGerritConnection()"
+                                {% if not config.ldap_username or not config.ldap_password %}disabled{% endif %}>
                             <i class="bi bi-play-circle me-1"></i>测试 Gerrit 连接
                         </button>
+                        <div id="gerritTestResult" class="test-result mt-2"></div>
                     </div>
+
                     {% if not config.ldap_username or not config.ldap_password %}
-                    <div class="form-text text-danger">
-                        <i class="bi bi-exclamation-triangle me-1"></i>请先保存 LDAP 账号和密码
+                    <div class="alert alert-warning alert-sm mt-3 mb-0" role="alert">
+                        <i class="bi bi-exclamation-triangle me-1"></i>
+                        <small>请先保存 LDAP 配置以启用 CRP 和 Gerrit 测试</small>
                     </div>
                     {% endif %}
-                </form>
+                </div>
             </div>
         </div>
-
-        <--list 配置说明 -->
-        <div class="alert alert-info mt-4" role="alert">
-            <h6 class="alert-heading">
-                <i class="bi bi-info-circle me-2"></i>配置说明
-            </h6>
-            <ul class="mb-0 small">
-                <li><strong>Gerrit 配置</strong>：必填，用于查询提交信息和检测代码同步状态</li>
-                <li><strong>维护者信息</strong>：可选，用于打包时的联系人信息</li>
-                <li><strong>GitHub Token</strong>：可选，后续用于创建和监控 PR</li>
-                <li><strong>CRP Token</strong>：可选，后续用于触发和监控打包任务</li>
-            </ul>
-        </div>
     </div>
-</div>
+</form>
+
+<style>
+.config-card {
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+    overflow: hidden;
+    transition: all 0.3s ease;
+}
+
+.config-card:hover {
+    box-shadow: 0 4px 12px rgba(0,0,0,0.12);
+}
+
+.config-header {
+    background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+    padding: 1.25rem;
+    border-bottom: 1px solid #e0e0e0;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.config-header-icon {
+    width: 48px;
+    height: 48px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.5rem;
+    flex-shrink: 0;
+}
+
+.ldap-icon {
+    background: linear-gradient(135deg, #667eea, #764ba2);
+    color: white;
+}
+
+.maintainer-icon {
+    background: linear-gradient(135deg, #f093fb, #f5576c);
+    color: white;
+}
+
+.github-icon {
+    background: linear-gradient(135deg, #24292e, #57606a);
+    color: white;
+}
+
+.crp-icon {
+    background: linear-gradient(135deg, #11998e, #38ef7d);
+    color: white;
+}
+
+.local-icon {
+    background: linear-gradient(135deg, #4facfe, #00f2fe);
+    color: white;
+}
+
+.test-icon {
+    background: linear-gradient(135deg, #fa709a, #fee140);
+    color: white;
+}
+
+.config-header h5 {
+    margin: 0;
+    color: #2c3e50;
+    font-weight: 600;
+}
+
+.config-body {
+    padding: 1.5rem;
+}
+
+.test-item {
+    padding: 0.75rem;
+    background: #f8f9fa;
+    border-radius: 8px;
+}
+
+.test-result {
+    font-size: 0.875rem;
+}
+
+.test-result.success {
+    color: #198754;
+}
+
+.test-result.error {
+    color: #dc3545;
+}
+
+.alert-sm {
+    padding: 0.5rem 0.75rem;
+    font-size: 0.875rem;
+}
+</style>
+
+<script>
+// 刷新CRP Token
+async function refreshCRPToken() {
+    const btn = document.getElementById('refreshCRPBtn');
+    const originalHtml = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>刷新中...';
+    
+    try {
+        const response = await fetch('/config/refresh-crp-token', {
+            method: 'POST'
+        });
+        const result = await response.json();
+        
+        if (result.success) {
+            alert('CRP Token 刷新成功！');
+            location.reload();
+        } else {
+            alert('刷新失败: ' + (result.message || '未知错误'));
+        }
+    } catch (error) {
+        console.error('刷新失败:', error);
+        alert('刷新失败: ' + error.message);
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = originalHtml;
+    }
+}
+
+// 测试CRP连接
+async function testCRPConnection() {
+    const resultDiv = document.getElementById('crpTestResult');
+    resultDiv.innerHTML = '<small class="text-muted"><i class="spinner-border spinner-border-sm me-1"></i>测试中...</small>';
+    
+    try {
+        const response = await fetch('/config/test-crp', {
+            method: 'POST'
+        });
+        const result = await response.json();
+        
+        if (result.success) {
+            resultDiv.innerHTML = '<small class="text-success"><i class="bi bi-check-circle me-1"></i>连接成功</small>';
+        } else {
+            resultDiv.innerHTML = `<small class="text-danger"><i class="bi bi-x-circle me-1"></i>${result.message}</small>`;
+        }
+    } catch (error) {
+        resultDiv.innerHTML = `<small class="text-danger"><i class="bi bi-x-circle me-1"></i>测试失败: ${error.message}</small>`;
+    }
+}
+
+// 测试GitHub连接（可访问性）
+async function testGitHubConnection() {
+    const resultDiv = document.getElementById('githubTestResult');
+    resultDiv.innerHTML = '<small class="text-muted"><i class="spinner-border spinner-border-sm me-1"></i>测试中...</small>';
+    
+    try {
+        // 使用HEAD请求测试GitHub API可访问性，不需要认证
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 5000); // 5秒超时
+        
+        const response = await fetch('https://api.github.com', {
+            method: 'HEAD',
+            signal: controller.signal
+        });
+        
+        clearTimeout(timeoutId);
+        
+        if (response.ok || response.status === 403) { // 403也说明能访问到GitHub
+            resultDiv.innerHTML = '<small class="text-success"><i class="bi bi-check-circle me-1"></i>GitHub 可访问</small>';
+        } else {
+            resultDiv.innerHTML = `<small class="text-warning"><i class="bi bi-exclamation-triangle me-1"></i>状态码: ${response.status}</small>`;
+        }
+    } catch (error) {
+        if (error.name === 'AbortError') {
+            resultDiv.innerHTML = '<small class="text-danger"><i class="bi bi-x-circle me-1"></i>连接超时</small>';
+        } else {
+            resultDiv.innerHTML = `<small class="text-danger"><i class="bi bi-x-circle me-1"></i>无法访问 GitHub</small>`;
+        }
+    }
+}
+
+// 测试Gerrit连接
+async function testGerritConnection() {
+    const project = document.getElementById('gerritTestProject').value;
+    const resultDiv = document.getElementById('gerritTestResult');
+    
+    if (!project) {
+        resultDiv.innerHTML = '<small class="text-warning"><i class="bi bi-exclamation-triangle me-1"></i>请输入项目名</small>';
+        return;
+    }
+    
+    resultDiv.innerHTML = '<small class="text-muted"><i class="spinner-border spinner-border-sm me-1"></i>测试中...</small>';
+    
+    try {
+        const response = await fetch('/config/test-gerrit', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+            },
+            body: `test_project=${encodeURIComponent(project)}`
+        });
+        const result = await response.json();
+        
+        if (result.success) {
+            resultDiv.innerHTML = '<small class="text-success"><i class="bi bi-check-circle me-1"></i>连接成功</small>';
+        } else {
+            resultDiv.innerHTML = `<small class="text-danger"><i class="bi bi-x-circle me-1"></i>${result.message}</small>`;
+        }
+    } catch (error) {
+        resultDiv.innerHTML = `<small class="text-danger"><i class="bi bi-x-circle me-1"></i>测试失败: ${error.message}</small>`;
+    }
+}
+</script>
 {% endblock %}

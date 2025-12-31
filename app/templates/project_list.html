@@ -13,212 +13,476 @@
 </div>
 
 {% if project_data %}
-<div class="card shadow-sm">
-    <div class="card-body p-0">
-        <div class="table-responsive">
-            <table class="table table-hover mb-0">
-                <thead class="table-light">
-                    <tr>
-                        <th style="width: 5%">#</th>
-                        <th style="width: 15%">项目名</th>
-                        <th style="width: 12%">Gerrit分支</th>
-                        <th style="width: 12%">GitHub分支</th>
-                        <th style="width: 25%">最后打包Commit</th>
-                        <th style="width: 13%">仓库状态</th>
-                        <th style="width: 18%" class="text-end">操作</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for item in project_data %}
-                    {% set project = item.project %}
-                    <tr>
-                        <td class="text-muted">{{ loop.index }}</td>
-                        <td>
-                            <strong class="text-primary">{{ project.name }}</strong>
-                        </td>
-                        <td>
-                            {% if project.gerrit_branch %}
-                                <span class="badge bg-secondary">{{ project.gerrit_branch }}</span>
-                            {% else %}
-                                <span class="text-muted">-</span>
-                            {% endif %}
-                        </td>
-                        <td>
-                            {% if project.github_branch %}
-                                <span class="badge bg-dark">{{ project.github_branch }}</span>
-                            {% else %}
-                                <span class="text-muted">-</span>
-                            {% endif %}
-                        </td>
-                        <td>
-                            {% if item.commit_message %}
-                                <span class="text-truncate d-inline-block" style="max-width: 300px;" title="{{ item.commit_message }}">
-                                    {{ item.commit_message }}
-                                </span>
-                                <br>
-                                <code class="text-muted small">{{ project.last_commit_hash[:12] }}</code>
-                            {% elif project.last_commit_hash %}
-                                <code class="text-muted small">{{ project.last_commit_hash[:12] }}...</code>
-                            {% else %}
-                                <span class="text-muted">-</span>
-                            {% endif %}
-                        </td>
-                        <td>
-                            <span id="repo-status-{{ project.id }}">
-                                {% if project.repo_status == 'ready' %}
-                                    <span class="badge bg-success"><i class="bi bi-check-circle me-1"></i>就绪</span>
-                                    <button class="btn btn-sm btn-outline-secondary ms-1" 
-                                            onclick="cloneRepo({{ project.id }})" 
-                                            title="重新克隆仓库">
-                                        <i class="bi bi-arrow-clockwise"></i>
-                                    </button>
-                                {% elif project.repo_status == 'cloning' %}
-                                    <span class="badge bg-primary">
-                                        <span class="spinner-border spinner-border-sm me-1" role="status"></span>克隆中
-                                    </span>
-                                {% elif project.repo_status == 'error' %}
-                                    <button class="btn btn-sm btn-danger" onclick="cloneRepo({{ project.id }})" title="{{ project.repo_error }}">
-                                        <i class="bi bi-arrow-clockwise me-1"></i>重试
-                                    </button>
-                                {% else %}
-                                    <button class="btn btn-sm btn-outline-secondary" onclick="cloneRepo({{ project.id }})">
-                                        <i class="bi bi-download me-1"></i>克隆仓库
-                                    </button>
-                                {% endif %}
+<div class="table-container">
+    <table class="modern-table">
+        <thead>
+            <tr>
+                <th><i class="bi bi-folder"></i> 项目名</th>
+                <th><i class="bi bi-git"></i> Gerrit分支</th>
+                <th><i class="bi bi-github"></i> GitHub分支</th>
+                <th><i class="bi bi-chat-square-text"></i> 最后Commit</th>
+                <th><i class="bi bi-activity"></i> 仓库状态</th>
+                <th class="text-center"><i class="bi bi-gear"></i> 操作</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for item in project_data %}
+            {% set project = item.project %}
+            <tr>
+                <td>
+                    <div class="project-cell">
+                        <strong>{{ project.name }}</strong>
+                    </div>
+                </td>
+                <td>
+                    {% if project.gerrit_branch %}
+                        <span class="badge-modern badge-gerrit">
+                            <i class="bi bi-git"></i> {{ project.gerrit_branch }}
+                        </span>
+                    {% else %}
+                        <span class="text-muted">-</span>
+                    {% endif %}
+                </td>
+                <td>
+                    {% if project.github_branch %}
+                        <span class="badge-modern badge-github">
+                            <i class="bi bi-github"></i> {{ project.github_branch }}
+                        </span>
+                    {% else %}
+                        <span class="text-muted">-</span>
+                    {% endif %}
+                </td>
+                <td>
+                    {% if item.commit_message %}
+                        <div class="commit-cell">
+                            <div class="commit-message">{{ item.commit_message }}</div>
+                            <code class="commit-hash">{{ project.last_commit_hash[:10] }}</code>
+                        </div>
+                    {% elif project.last_commit_hash %}
+                        <code class="commit-hash">{{ project.last_commit_hash[:10] }}...</code>
+                    {% else %}
+                        <span class="text-muted">暂无记录</span>
+                    {% endif %}
+                </td>
+                <td>
+                    <span id="repo-status-{{ project.id }}">
+                        {% if project.repo_status == 'ready' %}
+                            <span class="status-badge status-success">
+                                <i class="bi bi-check-circle-fill"></i> 就绪
                             </span>
-                        </td>
-                        <td class="text-end">
-                            <div class="btn-group btn-group-sm" role="group">
-                                <a href="{{ url_for('project.project_edit', id=project.id) }}" 
-                                   class="btn btn-outline-primary" 
-                                   title="编辑">
-                                    <i class="bi bi-pencil"></i>
-                                </a>
-                                <button type="button" 
-                                        class="btn btn-outline-danger" 
-                                        onclick="confirmDelete({{ project.id }}, '{{ project.name }}')"
-                                        title="删除">
-                                    <i class="bi bi-trash"></i>
-                                </button>
-                            </div>
-                        </td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        </div>
-    </div>
+                        {% elif project.repo_status == 'cloning' %}
+                            <span class="status-badge status-building">
+                                <span class="spinner-border spinner-border-sm me-1"></span> 克隆中
+                            </span>
+                        {% elif project.repo_status == 'error' %}
+                            <span class="status-badge status-failed">
+                                <i class="bi bi-x-circle-fill"></i> 错误
+                            </span>
+                        {% else %}
+                            <span class="status-badge status-pending">
+                                <i class="bi bi-clock-fill"></i> 待克隆
+                            </span>
+                        {% endif %}
+                    </span>
+                </td>
+                <td class="text-center">
+                    <div class="btn-group" role="group">
+                        <a href="{{ url_for('project.project_edit', id=project.id) }}" 
+                           class="btn btn-sm btn-info-modern"
+                           title="编辑项目">
+                            <i class="bi bi-pencil"></i>
+                        </a>
+                        
+                        {% if project.repo_status == 'ready' %}
+                        <button class="btn btn-sm btn-warning-modern" 
+                                onclick="cloneRepo({{ project.id }})" 
+                                title="重新克隆仓库">
+                            <i class="bi bi-arrow-clockwise"></i>
+                        </button>
+                        {% elif project.repo_status == 'error' or project.repo_status == 'pending' %}
+                        <button class="btn btn-sm btn-success-modern" 
+                                onclick="cloneRepo({{ project.id }})"
+                                title="克隆仓库">
+                            <i class="bi bi-cloud-download"></i>
+                        </button>
+                        {% endif %}
+                        
+                        <button class="btn btn-sm btn-danger-modern" 
+                                onclick="deleteProject({{ project.id }}, '{{ project.name }}')"
+                                title="删除项目">
+                            <i class="bi bi-trash"></i>
+                        </button>
+                    </div>
+                    
+                    {% if project.repo_status == 'error' and project.repo_error %}
+                    <div class="error-tooltip">
+                        <i class="bi bi-exclamation-triangle-fill text-danger"></i>
+                        <span class="error-text">{{ project.repo_error }}</span>
+                    </div>
+                    {% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
 </div>
-
-<div class="mt-3 text-muted">
-    <small>共 {{ project_data|length }} 个项目</small>
-</div>
-
 {% else %}
 <div class="text-center py-5">
-    <i class="bi bi-inbox display-1 text-muted"></i>
-    <h4 class="mt-3 text-muted">暂无项目</h4>
-    <p class="text-muted">点击上方"新建项目"按钮创建第一个项目</p>
-    <a href="{{ url_for('project.project_create') }}" class="btn btn-primary mt-3">
-        <i class="bi bi-plus-circle me-1"></i>立即创建
+    <i class="bi bi-folder-x" style="font-size: 4rem; color: #ccc;"></i>
+    <p class="mt-3 text-muted">暂无项目</p>
+    <a href="{{ url_for('project.project_create') }}" class="btn btn-primary mt-2">
+        <i class="bi bi-plus-circle me-1"></i>创建第一个项目
     </a>
 </div>
 {% endif %}
 
-<!-- 删除确认模态框 -->
-<div class="modal fade" id="deleteModal" tabindex="-1">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title">
-                    <i class="bi bi-exclamation-triangle text-warning me-2"></i>确认删除
-                </h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-            </div>
-            <div class="modal-body">
-                确定要删除项目 <strong id="deleteProjectName"></strong> 吗？此操作不可恢复。
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
-                <form id="deleteForm" method="POST" style="display: inline;">
-                    <button type="submit" class="btn btn-danger">
-                        <i class="bi bi-trash me-1"></i>确认删除
-                    </button>
-                </form>
-            </div>
-        </div>
-    </div>
-</div>
-{% endblock %}
-
-{% block scripts %}
-<script>
-function confirmDelete(projectId, projectName) {
-    document.getElementById('deleteProjectName').textContent = projectName;
-    document.getElementById('deleteForm').action = `/projects/${projectId}/delete`;
-    new bootstrap.Modal(document.getElementById('deleteModal')).show();
+<style>
+/* 现代化表格样式 */
+.table-container {
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+    overflow: hidden;
 }
 
-// 克隆仓库
-function cloneRepo(projectId) {
-    const statusSpan = document.getElementById(`repo-status-${projectId}`);
+.modern-table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+    font-size: 0.95rem;
+}
+
+.modern-table thead {
+    background: linear-gradient(135deg, #0d6efd 0%, #0a58ca 100%);
+    color: white;
+}
+
+.modern-table thead th {
+    padding: 1rem;
+    text-align: left;
+    font-weight: 600;
+    font-size: 0.875rem;
+    letter-spacing: 0.5px;
+    border: none;
+    white-space: nowrap;
+}
+
+.modern-table thead th i {
+    margin-right: 0.5rem;
+    opacity: 0.9;
+}
+
+.modern-table tbody tr {
+    border-bottom: 1px solid #f0f0f0;
+    transition: all 0.2s ease;
+}
+
+.modern-table tbody tr:hover {
+    background: #f8f9fe;
+    transform: scale(1.005);
+    box-shadow: 0 2px 8px rgba(13, 110, 253, 0.1);
+}
+
+.modern-table tbody tr:last-child {
+    border-bottom: none;
+}
+
+.modern-table tbody td {
+    padding: 1rem;
+    vertical-align: middle;
+    border: none;
+}
+
+.project-cell strong {
+    color: #2c3e50;
+    font-size: 1rem;
+}
+
+.badge-modern {
+    padding: 0.375rem 0.75rem;
+    border-radius: 6px;
+    font-weight: 500;
+    font-size: 0.875rem;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+}
+
+.badge-gerrit {
+    background: #e3f2fd;
+    color: #1976d2;
+    border: 1px solid #bbdefb;
+}
+
+.badge-github {
+    background: #f6f8fa;
+    color: #24292f;
+    border: 1px solid #d0d7de;
+}
+
+.commit-cell {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
+.commit-message {
+    color: #495057;
+    font-size: 0.875rem;
+    max-width: 300px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.commit-hash {
+    background: #f5f5f5;
+    color: #616161;
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+    font-family: 'Courier New', monospace;
+    font-size: 0.75rem;
+    border: 1px solid #e0e0e0;
+    display: inline-block;
+    width: fit-content;
+}
+
+.status-badge {
+    padding: 0.5rem 0.875rem;
+    border-radius: 8px;
+    font-weight: 600;
+    font-size: 0.875rem;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    white-space: nowrap;
+}
+
+.status-success {
+    background: #d1e7dd;
+    color: #0f5132;
+    border: 1px solid #badbcc;
+}
+
+.status-failed {
+    background: #f8d7da;
+    color: #842029;
+    border: 1px solid #f5c2c7;
+}
+
+.status-building {
+    background: #cfe2ff;
+    color: #084298;
+    border: 1px solid #b6d4fe;
+}
+
+.status-pending {
+    background: #fff3cd;
+    color: #856404;
+    border: 1px solid #ffecb5;
+}
+
+.btn-group {
+    display: inline-flex;
+    gap: 0.25rem;
+    margin-bottom: 0.25rem;
+}
+
+.btn-info-modern {
+    background: linear-gradient(135deg, #3b82f6, #2563eb);
+    color: white;
+    border: none;
+    padding: 0.5rem 0.875rem;
+    border-radius: 6px;
+    transition: all 0.2s ease;
+    font-weight: 500;
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+}
+
+.btn-info-modern:hover {
+    background: linear-gradient(135deg, #2563eb, #1d4ed8);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);
+    color: white;
+}
+
+.btn-warning-modern {
+    background: linear-gradient(135deg, #f59e0b, #d97706);
+    color: white;
+    border: none;
+    padding: 0.5rem 0.875rem;
+    border-radius: 6px;
+    transition: all 0.2s ease;
+    font-weight: 500;
+}
+
+.btn-warning-modern:hover {
+    background: linear-gradient(135deg, #d97706, #b45309);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(217, 119, 6, 0.3);
+    color: white;
+}
+
+.btn-success-modern {
+    background: linear-gradient(135deg, #10b981, #059669);
+    color: white;
+    border: none;
+    padding: 0.5rem 0.875rem;
+    border-radius: 6px;
+    transition: all 0.2s ease;
+    font-weight: 500;
+}
+
+.btn-success-modern:hover {
+    background: linear-gradient(135deg, #059669, #047857);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(5, 150, 105, 0.3);
+    color: white;
+}
+
+.btn-danger-modern {
+    background: linear-gradient(135deg, #ff6b6b, #ee5a6f);
+    color: white;
+    border: none;
+    padding: 0.5rem 0.875rem;
+    border-radius: 6px;
+    transition: all 0.2s ease;
+    font-weight: 500;
+}
+
+.btn-danger-modern:hover {
+    background: linear-gradient(135deg, #ff5252, #e64a64);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(238, 90, 111, 0.3);
+    color: white;
+}
+
+.error-tooltip {
+    margin-top: 0.5rem;
+    font-size: 0.75rem;
+    color: #dc3545;
+    display: flex;
+    align-items: start;
+    gap: 0.25rem;
+}
+
+.error-text {
+    max-width: 200px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.spinner-border-sm {
+    width: 0.875rem;
+    height: 0.875rem;
+    border-width: 0.15em;
+}
+
+/* 响应式优化 */
+@media (max-width: 1400px) {
+    .commit-message {
+        max-width: 200px;
+    }
+}
+
+@media (max-width: 1200px) {
+    .modern-table {
+        font-size: 0.875rem;
+    }
     
+    .modern-table thead th,
+    .modern-table tbody td {
+        padding: 0.75rem;
+    }
+    
+    .commit-message {
+        max-width: 150px;
+    }
+}
+
+@media (max-width: 768px) {
+    .table-container {
+        overflow-x: auto;
+    }
+    
+    .modern-table {
+        min-width: 900px;
+    }
+}
+</style>
+
+<script>
+function cloneRepo(projectId) {
+    if (!confirm('确定要克隆此项目的仓库吗？如果仓库已存在，将会删除并重新克隆。')) {
+        return;
+    }
+
+    const statusSpan = document.querySelector(`#repo-status-${projectId}`);
+    statusSpan.innerHTML = '<span class="status-badge status-building"><span class="spinner-border spinner-border-sm me-1"></span> 克隆中</span>';
+
     fetch(`/projects/${projectId}/clone`, {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json'
-        }
+        method: 'POST'
     })
     .then(response => response.json())
     .then(data => {
         if (data.success) {
-            // 显示克隆中状态
-            statusSpan.innerHTML = '<span class="badge bg-primary"><span class="spinner-border spinner-border-sm me-1"></span>克隆中</span>';
-            // 开始轮询状态
             pollRepoStatus(projectId);
         } else {
+            statusSpan.innerHTML = '<span class="status-badge status-error"><i class="bi bi-x-circle-fill"></i> 错误</span>';
             alert('克隆失败: ' + data.message);
         }
     })
-    .catch(error => {
-        alert('请求失败: ' + error);
+    .catch(err => {
+        statusSpan.innerHTML = '<span class="status-badge status-error"><i class="bi bi-x-circle-fill"></i> 错误</span>';
+        alert('请求失败: ' + err);
     });
 }
 
-// 轮询仓库状态
 function pollRepoStatus(projectId) {
     const interval = setInterval(() => {
-        fetch(`/projects/${projectId}/repo-status`)
+        fetch(`/projects/${projectId}/status`)
         .then(response => response.json())
         .then(data => {
             if (data.success) {
-                const statusSpan = document.getElementById(`repo-status-${projectId}`);
+                const statusSpan = document.querySelector(`#repo-status-${projectId}`);
+                const status = data.data.repo_status;
                 
-                if (data.status === 'ready') {
-                    statusSpan.innerHTML = '<span class="badge bg-success"><i class="bi bi-check-circle me-1"></i>就绪</span>';
+                if (status === 'ready') {
+                    statusSpan.innerHTML = '<span class="status-badge status-success"><i class="bi bi-check-circle-fill"></i> 就绪</span>';
                     clearInterval(interval);
-                    // 刷新页面以显示 commit message
-                    setTimeout(() => location.reload(), 1000);
-                } else if (data.status === 'error') {
-                    statusSpan.innerHTML = `<span class="badge bg-danger" title="${data.error}"><i class="bi bi-x-circle me-1"></i>错误</span>`;
+                    location.reload();
+                } else if (status === 'error') {
+                    statusSpan.innerHTML = '<span class="status-badge status-failed"><i class="bi bi-x-circle-fill"></i> 错误</span>';
                     clearInterval(interval);
+                    alert('克隆失败: ' + data.data.repo_error);
                 }
             }
-        })
-        .catch(() => {
-            // 忽略错误，继续轮询
         });
-    }, 2000); // 每2秒轮询一次
+    }, 2000);
 }
 
-// 页面加载时检查是否有正在克隆的项目
-document.addEventListener('DOMContentLoaded', () => {
-    document.querySelectorAll('[id^="repo-status-"]').forEach(element => {
-        if (element.innerHTML.includes('克隆中')) {
-            const projectId = element.id.replace('repo-status-', '');
-            pollRepoStatus(projectId);
+function deleteProject(projectId, projectName) {
+    if (!confirm(`确定要删除项目 "${projectName}" 吗？此操作不可恢复。`)) {
+        return;
+    }
+
+    fetch(`/projects/${projectId}`, {
+        method: 'DELETE'
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            location.reload();
+        } else {
+            alert('删除失败: ' + data.message);
         }
+    })
+    .catch(err => {
+        alert('请求失败: ' + err);
     });
-});
+}
 </script>
 {% endblock %}

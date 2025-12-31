@@ -262,6 +262,37 @@ fe9YvvT0lqy2BtBpaQIDAQAB
             return False
     
     @staticmethod
+    def retry_build(token: str, release_id: int) -> bool:
+        """
+        重试构建一个包
+        
+        Args:
+            token: CRP Token
+            release_id: Release ID
+            
+        Returns:
+            成功返回True，失败返回False
+        """
+        try:
+            url = f"{CRPService.BASE_URL}/topic_releases/{release_id}/retry"
+            headers = {"Authorization": f"Bearer {token}"}
+            
+            response = requests.post(url, headers=headers, timeout=30)
+            response.raise_for_status()
+            
+            logger.info(f"成功触发重试构建: {release_id}")
+            return True
+            
+        except requests.exceptions.RequestException as e:
+            logger.error(f"重试构建失败: {str(e)}")
+            if hasattr(e, 'response') and e.response:
+                logger.error(f"响应内容: {e.response.text}")
+            return False
+        except Exception as e:
+            logger.error(f"重试构建异常: {str(e)}")
+            return False
+    
+    @staticmethod
     def get_build_state_info(state: str) -> Dict[str, str]:
         """
         获取构建状态的显示信息
