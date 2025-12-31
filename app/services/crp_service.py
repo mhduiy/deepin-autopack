@@ -293,6 +293,87 @@ fe9YvvT0lqy2BtBpaQIDAQAB
             return False
     
     @staticmethod
+    def submit_build(token: str, topic_id: int, project_id: int, project_name: str,
+                    branch: str, commit: str, tag: str, arches: str,
+                    branch_id: int, changelog: str = "") -> Optional[Dict]:
+        """
+        提交CRP打包任务
+        
+        Args:
+            token: CRP Token
+            topic_id: 主题ID
+            project_id: 项目ID
+            project_name: 项目名称
+            branch: 分支名称
+            commit: commit hash
+            tag: 版本tag
+            arches: 架构列表，格式: "amd64;arm64;loong64"
+            branch_id: CRP分支ID
+            changelog: changelog信息
+            
+        Returns:
+            成功返回包含build_id的字典，失败返回None
+        """
+        try:
+            url = f"{CRPService.BASE_URL}/topics/{topic_id}/new_release"
+            headers = {
+                "Authorization": f"Bearer {token}",
+                "Content-Type": "application/json"
+            }
+            data = {
+                "Arches": arches,
+                "BaseTag": None,
+                "Branch": branch,
+                "BuildID": 0,
+                "BuildState": None,
+                "Changelog": [changelog] if changelog else [],
+                "Commit": commit,
+                "History": None,
+                "ID": 0,
+                "ProjectID": project_id,
+                "ProjectName": project_name,
+                "ProjectRepoUrl": None,
+                "SlaveNode": None,
+                "Tag": tag,
+                "TagSuffix": None,
+                "TopicID": topic_id,
+                "TopicType": "test",  # 默认test类型
+                "ChangeLogMode": True,
+                "RepoType": "deb",
+                "Custom": True,
+                "BranchID": str(branch_id)
+            }
+            
+            response = requests.post(
+                url,
+                headers=headers,
+                json=data,
+                timeout=30
+            )
+            response.raise_for_status()
+            
+            result = response.json()
+            logger.info(f"CRP打包任务提交成功: project={project_name}, commit={commit[:8]}")
+            logger.debug(f"CRP响应: {result}")
+            
+            # 构建返回结果
+            return {
+                'success': True,
+                'build_id': result.get('ID', 0),
+                'url': f"https://crp.uniontech.com/topics/{topic_id}",
+                'message': '打包任务已提交'
+            }
+            
+        except requests.exceptions.RequestException as e:
+            logger.error(f"提交CRP打包任务失败: {str(e)}")
+            if hasattr(e, 'response') and e.response:
+                logger.error(f"响应内容: {e.response.text}")
+            return None
+        except Exception as e:
+            logger.error(f"提交CRP打包任务异常: {str(e)}")
+            return None
+    
+    @staticmethod
     def get_build_state_info(state: str) -> Dict[str, str]:
         """
         获取构建状态的显示信息

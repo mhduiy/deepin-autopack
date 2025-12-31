@@ -1,4 +1,5 @@
 from app import db
+from app.models.build_task import BuildTask, BuildTaskStep
 
 class Project(db.Model):
     """项目配置模型"""
@@ -46,6 +47,7 @@ class GlobalConfig(db.Model):
     gerrit_url = db.Column(db.String(500), comment='Gerrit服务器地址')
     maintainer_name = db.Column(db.String(100), comment='维护者姓名')
     maintainer_email = db.Column(db.String(255), comment='维护者邮箱')
+    github_username = db.Column(db.String(100), comment='GitHub用户名')
     github_token = db.Column(db.String(255), comment='GitHub Token')
     crp_token = db.Column(db.String(255), comment='CRP Token')
     crp_branch_id = db.Column(db.Integer, comment='CRP项目分支ID')

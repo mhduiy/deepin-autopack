@@ -1,0 +1,459 @@
+"""
+打包任务路由
+"""
+
+from flask import Blueprint, render_template, jsonify, request
+from app.services.build_task_service import BuildTaskService
+import logging
+
+logger = logging.getLogger(__name__)
+
+build_bp = Blueprint('build', __name__)
+
+
+@build_bp.route('/tasks')
+def tasks():
+    """打包任务列表页面"""
+    return render_template('build.html')
+
+
+@build_bp.route('/api/tasks', methods=['GET'])
+def api_get_tasks():
+    """获取任务列表API"""
+    try:
+        # 从数据库读取任务列表
+        tasks = BuildTaskService.get_all_tasks(limit=100)
+        
+        # 如果没有数据，返回空列表
+        if not tasks:
+            return jsonify({
+                'success': True,
+                'data': []
+            })
+        
+        # 格式化任务数据以匹配前端需求
+        formatted_tasks = []
+        for task in tasks:
+            # 格式化步骤数据
+            steps = []
+            for step in task.get('steps', []):
+                steps.append({
+                    'name': step['step_name'],
+                    'status': step['status'],
+                    'time': step['completed_at'] or step['started_at'],
+                    'log_message': step['log_message'],
+                    'error_message': step.get('error_message')
+                })
+            
+            formatted_task = {
+                'id': task['id'],
+                'project_name': task['project_name'],
+                'version': task['version'],
+                'mode': task['package_mode'],
+                'status': task['status'],
+                'current_step': task['current_step'],
+                'architectures': task['architectures'] or [],
+                'steps': steps,
+                'created_at': task['created_at'],
+                'started_at': task['started_at'],
+                'updated_at': task['updated_at'],
+                'completed_at': task['completed_at'],
+                'github_pr_url': task['github_pr_url'],
+                'github_pr_number': task['github_pr_number'],
+                'crp_build_url': task['crp_build_url'],
+                'error': task['error_message']
+            }
+            formatted_tasks.append(formatted_task)
+        
+        return jsonify({
+            'success': True,
+            'data': formatted_tasks
+        })
+        
+    except Exception as e:
+        logger.exception(f"获取任务列表失败: {e}")
+        return jsonify({
+            'success': False,
+            'message': f'获取任务列表失败: {str(e)}'
+        }), 500
+
+
+# ==================== 新增任务控制API ====================
+            'id': 1,
+            'project_name': 'dde-control-center',
+            'version': '6.0.52',
+            'mode': 'normal',
+            'status': 'running',
+            'current_step': 3,
+            'architectures': ['amd64', 'arm64', 'loongarch64'],
+            'steps': [
+                {
+                    'name': '检查环境',
+                    'status': 'completed',
+                    'time': '2024-12-31 10:23:15',
+                    'log_message': '环境检查通过\n- 仓库路径正常\n- dch工具已安装\n- gh工具已安装'
+                },
+                {
+                    'name': '拉取最新代码',
+                    'status': 'completed',
+                    'time': '2024-12-31 10:23:45',
+                    'log_message': '代码拉取成功\n分支: master\n最新提交: abc1234'
+                },
+                {
+                    'name': '生成Changelog',
+                    'status': 'running',
+                    'time': '2024-12-31 10:24:10',
+                    'log_message': '正在生成changelog文件...'
+                },
+                {
+                    'name': '提交Commit',
+                    'status': 'pending',
+                    'time': None
+                },
+                {
+                    'name': '推送到远程',
+                    'status': 'pending',
+                    'time': None
+                },
+                {
+                    'name': '创建PR',
+                    'status': 'pending',
+                    'time': None
+                },
+                {
+                    'name': '监控PR状态',
+                    'status': 'pending',
+                    'time': None
+                },
+                {
+                    'name': '等待同步',
+                    'status': 'pending',
+                    'time': None
+                },
+                {
+                    'name': 'CRP打包',
+                    'status': 'pending',
+                    'time': None
+                },
+                {
+                    'name': '监控打包',
+                    'status': 'pending',
+                    'time': None
+                },
+            ],
+            'created_at': '2024-12-31 10:23:10',
+            'started_at': '2024-12-31 10:23:12',
+            'updated_at': '2024-12-31 10:24:15',
+            'completed_at': None,
+            'github_pr_url': None,
+            'github_pr_number': None,
+            'crp_build_url': None,
+            'error': None
+        },
+        {
+            'id': 2,
+            'project_name': 'deepin-music',
+            'version': '7.0.8',
+            'mode': 'normal',
+            'status': 'success',
+            'current_step': 10,
+            'architectures': ['amd64', 'arm64'],
+            'steps': [
+                {'name': '检查环境', 'status': 'completed', 'time': '2024-12-31 09:15:20', 'log_message': '环境检查通过'},
+                {'name': '拉取最新代码', 'status': 'completed', 'time': '2024-12-31 09:15:30', 'log_message': '代码拉取成功'},
+                {'name': '生成Changelog', 'status': 'completed', 'time': '2024-12-31 09:15:50', 'log_message': 'Changelog已生成: 7.0.8'},
+                {'name': '提交Commit', 'status': 'completed', 'time': '2024-12-31 09:16:05', 'log_message': 'Commit提交成功: def5678'},
+                {'name': '推送到远程', 'status': 'completed', 'time': '2024-12-31 09:16:20', 'log_message': '推送成功'},
+                {'name': '创建PR', 'status': 'completed', 'time': '2024-12-31 09:16:35', 'log_message': 'PR创建成功'},
+                {'name': '监控PR状态', 'status': 'completed', 'time': '2024-12-31 09:20:15', 'log_message': 'PR已合并'},
+                {'name': '等待同步', 'status': 'completed', 'time': '2024-12-31 09:23:45', 'log_message': '同步完成: def5678'},
+                {'name': 'CRP打包', 'status': 'completed', 'time': '2024-12-31 09:24:10', 'log_message': 'CRP打包任务已提交: BUILD-12345'},
+                {'name': '监控打包', 'status': 'completed', 'time': '2024-12-31 09:35:45', 'log_message': '打包成功'},
+            ],
+            'created_at': '2024-12-31 09:15:10',
+            'started_at': '2024-12-31 09:15:12',
+            'updated_at': '2024-12-31 09:35:45',
+            'completed_at': '2024-12-31 09:35:45',
+            'github_pr_url': 'https://github.com/linuxdeepin/deepin-music/pull/123',
+            'github_pr_number': 123,
+            'crp_build_url': 'https://crp.uniontech.com/build/12345',
+            'error': None
+        },
+        {
+            'id': 3,
+            'project_name': 'dde-appearance',
+            'version': '6.1.15',
+            'mode': 'normal',
+            'status': 'failed',
+            'current_step': 6,
+            'architectures': ['amd64', 'arm64', 'loongarch64', 'riscv64'],
+            'steps': [
+                {'name': '检查环境', 'status': 'completed', 'time': '2024-12-31 08:30:15', 'log_message': '环境检查通过'},
+                {'name': '拉取最新代码', 'status': 'completed', 'time': '2024-12-31 08:30:30', 'log_message': '代码拉取成功'},
+                {'name': '生成Changelog', 'status': 'completed', 'time': '2024-12-31 08:30:45', 'log_message': 'Changelog已生成'},
+                {'name': '提交Commit', 'status': 'completed', 'time': '2024-12-31 08:30:58', 'log_message': 'Commit提交成功'},
+                {'name': '推送到远程', 'status': 'completed', 'time': '2024-12-31 08:31:02', 'log_message': '推送成功'},
+                {
+                    'name': '创建PR',
+                    'status': 'failed',
+                    'time': '2024-12-31 08:31:05',
+                    'log_message': None,
+                    'error_message': 'GitHub API 调用失败: API rate limit exceeded. Please try again later.'
+                },
+                {'name': '监控PR状态', 'status': 'pending', 'time': None},
+                {'name': '等待同步', 'status': 'pending', 'time': None},
+                {'name': 'CRP打包', 'status': 'pending', 'time': None},
+                {'name': '监控打包', 'status': 'pending', 'time': None},
+            ],
+            'created_at': '2024-12-31 08:30:10',
+            'started_at': '2024-12-31 08:30:12',
+            'updated_at': '2024-12-31 08:31:05',
+            'completed_at': None,
+            'github_pr_url': None,
+            'github_pr_number': None,
+            'crp_build_url': None,
+            'error': 'GitHub API 调用失败: API rate limit exceeded. Please try again later.'
+        },
+        {
+            'id': 4,
+            'project_name': 'deepin-calculator',
+            'version': '6.5.2',
+            'mode': 'changelog_only',
+            'status': 'paused',
+            'current_step': 7,
+            'architectures': ['amd64'],
+            'steps': [
+                {'name': '检查环境', 'status': 'completed', 'time': '2024-12-31 07:20:10', 'log_message': '环境检查通过'},
+                {'name': '拉取最新代码', 'status': 'completed', 'time': '2024-12-31 07:20:25', 'log_message': '代码拉取成功'},
+                {'name': '生成Changelog', 'status': 'completed', 'time': '2024-12-31 07:20:35', 'log_message': 'Changelog已生成'},
+                {'name': '提交Commit', 'status': 'completed', 'time': '2024-12-31 07:20:48', 'log_message': 'Commit提交成功'},
+                {'name': '推送到远程', 'status': 'completed', 'time': '2024-12-31 07:21:00', 'log_message': '推送成功'},
+                {'name': '创建PR', 'status': 'completed', 'time': '2024-12-31 07:21:12', 'log_message': 'PR创建成功'},
+                {
+                    'name': '监控PR状态',
+                    'status': 'paused',
+                    'time': '2024-12-31 07:21:20',
+                    'log_message': 'PR合并超时，任务已暂停。\n请手动检查PR状态后点击继续。\nPR链接: https://github.com/linuxdeepin/deepin-calculator/pull/456'
+                },
+            ],
+            'created_at': '2024-12-31 07:20:05',
+            'started_at': '2024-12-31 07:20:07',
+            'updated_at': '2024-12-31 07:51:20',
+            'completed_at': None,
+            'github_pr_url': 'https://github.com/linuxdeepin/deepin-calculator/pull/456',
+            'github_pr_number': 456,
+            'crp_build_url': None,
+            'error': None
+        },
+        {
+            'id': 5,
+            'project_name': 'dde-file-manager',
+            'version': '6.2.18',
+            'mode': 'crp_only',
+            'status': 'success',
+            'current_step': 3,
+            'architectures': ['amd64', 'arm64'],
+            'steps': [
+                {'name': '检查环境', 'status': 'completed', 'time': '2024-12-31 06:15:10', 'log_message': '环境检查通过'},
+                {'name': 'CRP打包', 'status': 'completed', 'time': '2024-12-31 06:15:25', 'log_message': 'CRP打包任务已提交: BUILD-67890'},
+                {'name': '监控打包', 'status': 'completed', 'time': '2024-12-31 06:28:40', 'log_message': '打包成功'},
+            ],
+            'created_at': '2024-12-31 06:15:05',
+            'started_at': '2024-12-31 06:15:07',
+            'updated_at': '2024-12-31 06:28:40',
+            'completed_at': '2024-12-31 06:28:40',
+            'github_pr_url': None,
+            'github_pr_number': None,
+            'crp_build_url': 'https://crp.uniontech.com/build/67890',
+            'error': None
+        },
+    ]
+    
+    return jsonify({
+        'success': True,
+        'data': tasks
+    })
+
+
+# ==================== 新增任务控制API ====================
+
+@build_bp.route('/api/tasks/create', methods=['POST'])
+def api_create_task():
+    """创建打包任务"""
+    try:
+        data = request.get_json()
+        
+        # 验证必填参数
+        required = ['project_id', 'mode', 'version']
+        for field in required:
+            if field not in data:
+                return jsonify({
+                    'success': False,
+                    'message': f'缺少必填参数: {field}'
+                }), 400
+        
+        # 创建任务
+        task = BuildTaskService.create_task(
+            project_id=data['project_id'],
+            package_config={
+                'mode': data['mode'],
+                'version': data['version'],
+                'architectures': data.get('architectures', []),
+                'crp_topic_id': data.get('crp_topic_id'),
+                'start_commit_hash': data.get('start_commit_hash', '')
+            }
+        )
+        
+        return jsonify({
+            'success': True,
+            'task_id': task.id,
+            'message': '任务创建成功'
+        })
+        
+    except ValueError as e:
+        return jsonify({
+            'success': False,
+            'message': str(e)
+        }), 400
+    except Exception as e:
+        logger.exception(f"创建任务失败: {e}")
+        return jsonify({
+            'success': False,
+            'message': f'创建任务失败: {str(e)}'
+        }), 500
+
+
+@build_bp.route('/api/tasks/<int:task_id>/start', methods=['POST'])
+def api_start_task(task_id):
+    """启动任务"""
+    try:
+        task = BuildTaskService.start_task(task_id)
+        return jsonify({
+            'success': True,
+            'message': '任务已启动'
+        })
+    except ValueError as e:
+        return jsonify({
+            'success': False,
+            'message': str(e)
+        }), 400
+    except Exception as e:
+        logger.exception(f"启动任务失败: {e}")
+        return jsonify({
+            'success': False,
+            'message': f'启动任务失败: {str(e)}'
+        }), 500
+
+
+@build_bp.route('/api/tasks/<int:task_id>', methods=['GET'])
+def api_get_task(task_id):
+    """获取任务详情"""
+    try:
+        task_data = BuildTaskService.get_task_status(task_id)
+        return jsonify({
+            'success': True,
+            'data': task_data
+        })
+    except ValueError as e:
+        return jsonify({
+            'success': False,
+            'message': str(e)
+        }), 404
+    except Exception as e:
+        logger.exception(f"获取任务详情失败: {e}")
+        return jsonify({
+            'success': False,
+            'message': f'获取任务详情失败: {str(e)}'
+        }), 500
+
+
+@build_bp.route('/api/tasks/<int:task_id>/pause', methods=['POST'])
+def api_pause_task(task_id):
+    """暂停任务"""
+    try:
+        task = BuildTaskService.pause_task(task_id)
+        return jsonify({
+            'success': True,
+            'message': '任务已暂停'
+        })
+    except ValueError as e:
+        return jsonify({
+            'success': False,
+            'message': str(e)
+        }), 400
+    except Exception as e:
+        logger.exception(f"暂停任务失败: {e}")
+        return jsonify({
+            'success': False,
+            'message': f'暂停任务失败: {str(e)}'
+        }), 500
+
+
+@build_bp.route('/api/tasks/<int:task_id>/resume', methods=['POST'])
+def api_resume_task(task_id):
+    """恢复任务"""
+    try:
+        task = BuildTaskService.resume_task(task_id)
+        return jsonify({
+            'success': True,
+            'message': '任务已恢复'
+        })
+    except ValueError as e:
+        return jsonify({
+            'success': False,
+            'message': str(e)
+        }), 400
+    except Exception as e:
+        logger.exception(f"恢复任务失败: {e}")
+        return jsonify({
+            'success': False,
+            'message': f'恢复任务失败: {str(e)}'
+        }), 500
+
+
+@build_bp.route('/api/tasks/<int:task_id>/cancel', methods=['POST'])
+def api_cancel_task(task_id):
+    """取消任务"""
+    try:
+        task = BuildTaskService.cancel_task(task_id)
+        return jsonify({
+            'success': True,
+            'message': '任务已取消'
+        })
+    except ValueError as e:
+        return jsonify({
+            'success': False,
+            'message': str(e)
+        }), 400
+    except Exception as e:
+        logger.exception(f"取消任务失败: {e}")
+        return jsonify({
+            'success': False,
+            'message': f'取消任务失败: {str(e)}'
+        }), 500
+
+
+@build_bp.route('/api/tasks/<int:task_id>/retry', methods=['POST'])
+def api_retry_task(task_id):
+    """重试任务"""
+    try:
+        data = request.get_json() or {}
+        from_step = data.get('from_step', None)
+        
+        task = BuildTaskService.retry_task(task_id, from_step)
+        return jsonify({
+            'success': True,
+            'message': '任务已重试'
+        })
+    except ValueError as e:
+        return jsonify({
+            'success': False,
+            'message': str(e)
+        }), 400
+    except Exception as e:
+        logger.exception(f"重试任务失败: {e}")
+        return jsonify({
+            'success': False,
+            'message': f'重试任务失败: {str(e)}'
+        }), 500
+

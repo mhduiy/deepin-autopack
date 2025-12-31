@@ -30,6 +30,8 @@ def global_config():
             if ldap_password:
                 config.ldap_password = ldap_password
             
+            # GitHub配置
+            config.github_username = request.form.get('github_username')
             github_token = request.form.get('github_token')
             if github_token:
                 config.github_token = github_token

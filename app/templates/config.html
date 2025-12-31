@@ -113,19 +113,35 @@
                     </div>
                 </div>
                 <div class="config-body">
-                    <div class="mb-0">
-                        <label for="github_token" class="form-label">
-                            <i class="bi bi-key me-1"></i>GitHub Token
-                            {% if config.github_token %}
-                                <span class="badge bg-success ms-2">已设置</span>
-                            {% endif %}
-                        </label>
-                        <input type="password" 
-                               class="form-control font-monospace" 
-                               id="github_token" 
-                               name="github_token" 
-                               placeholder="{% if config.github_token %}留空则不修改{% else %}ghp_xxxxxxxxxxxx{% endif %}">
-                        <small class="form-text text-muted">用于 GitHub API 访问，留空则不修改</small>
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label for="github_username" class="form-label">
+                                <i class="bi bi-person-circle me-1"></i>GitHub 用户名
+                                <span class="text-danger">*</span>
+                            </label>
+                            <input type="text" 
+                                   class="form-control" 
+                                   id="github_username" 
+                                   name="github_username" 
+                                   value="{{ config.github_username or '' }}"
+                                   placeholder="your-github-username"
+                                   required>
+                            <small class="form-text text-muted">用于推送到你的fork仓库，例如: mhduiy</small>
+                        </div>
+                        <div class="col-md-6">
+                            <label for="github_token" class="form-label">
+                                <i class="bi bi-key me-1"></i>GitHub Token
+                                {% if config.github_token %}
+                                    <span class="badge bg-success ms-2">已设置</span>
+                                {% endif %}
+                            </label>
+                            <input type="password" 
+                                   class="form-control font-monospace" 
+                                   id="github_token" 
+                                   name="github_token" 
+                                   placeholder="{% if config.github_token %}留空则不修改{% else %}ghp_xxxxxxxxxxxx{% endif %}">
+                            <small class="form-text text-muted">用于 GitHub API 访问，留空则不修改</small>
+                        </div>
                     </div>
                 </div>
             </div>
