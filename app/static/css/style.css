@@ -233,3 +233,28 @@ input[type="submit"]:hover {
 .table tr:hover {
     background-color: #ddd;
 }
+
+/* 内联加载动画样式 */
+.loading-inline {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 2rem 1rem;
+}
+
+/* 内容区域淡入效果 */
+.content-fade-in {
+    animation: contentFadeIn 0.5s ease-in;
+}
+
+@keyframes contentFadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}

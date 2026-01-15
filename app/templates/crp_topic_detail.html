@@ -1,123 +1,36 @@
 {% extends "base.html" %}
 
-{% block title %}主题详情 - {{ topic.name }} - Deepin 自动打包工具{% endblock %}
+{% block title %}主题详情 - Deepin 自动打包工具{% endblock %}
 
 {% block content %}
-<div class="mb-4">
-    <a href="{{ url_for('crp.topics') }}" class="btn btn-outline-secondary btn-sm mb-3">
-        <i class="bi bi-arrow-left"></i> 返回主题列表
-    </a>
-    
-    <div class="topic-header">
-        <div class="topic-header-content">
-            <h2 class="mb-2">
-                <i class="bi bi-layers-fill text-primary me-2"></i>{{ topic.name }}
-            </h2>
-            <p class="text-muted mb-3">{{ topic.description }}</p>
-            <div class="topic-meta">
-                <span class="meta-badge">
-                    <i class="bi bi-calendar3"></i> {{ topic.create_time }}
-                </span>
-                <span class="meta-badge">
-                    <i class="bi bi-person-fill"></i> {{ topic.creator_name }}
-                </span>
+<!-- 主内容区域 -->
+<div id="mainContent">
+    <div class="mb-4">
+        <a href="{{ url_for('crp.topics') }}" class="btn btn-outline-secondary btn-sm mb-3">
+            <i class="bi bi-arrow-left"></i> 返回主题列表
+        </a>
+        
+        <div class="topic-header" id="topicHeader">
+            <!-- 加载中显示 -->
+            <div class="loading-inline">
+                <div class="spinner-border text-light me-2" role="status">
+                    <span class="visually-hidden">Loading...</span>
+                </div>
+                <span class="text-white">正在加载主题信息...</span>
             </div>
         </div>
     </div>
-</div>
 
-<div class="table-container">
-    <table class="modern-table">
-        <thead>
-            <tr>
-                <th><i class="bi bi-box-seam"></i> 包名</th>
-                <th><i class="bi bi-diagram-3"></i> 分支</th>
-                <th><i class="bi bi-tag"></i> 标签</th>
-                <th><i class="bi bi-hash"></i> Commit</th>
-                <th><i class="bi bi-cpu"></i> 架构</th>
-                <th><i class="bi bi-activity"></i> 构建状态</th>
-                <th class="text-center"><i class="bi bi-gear"></i> 操作</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for release in releases %}
-            <tr>
-                <td>
-                    <div class="package-cell">
-                        <strong>{{ release.project_name }}</strong>
-                        {% if release.project_name != release.source_pkg_name %}
-                        <small class="text-muted d-block">
-                            <i class="bi bi-arrow-return-right"></i> {{ release.source_pkg_name }}
-                        </small>
-                        {% endif %}
-                    </div>
-                </td>
-                <td>
-                    <span class="badge-modern badge-branch">{{ release.branch }}</span>
-                </td>
-                <td>
-                    <span class="badge-modern badge-tag">{{ release.tag }}</span>
-                </td>
-                <td>
-                    <code class="commit-hash">{{ release.commit[:10] if release.commit else 'N/A' }}</code>
-                </td>
-                <td>
-                    <span class="badge-modern badge-arch">{{ release.arches }}</span>
-                </td>
-                <td>
-                    {% if release.build_state == 'SUCCESS' %}
-                        <span class="status-badge status-success">
-                            <i class="bi bi-check-circle-fill"></i> 成功
-                        </span>
-                    {% elif release.build_state == 'FAILED' %}
-                        <span class="status-badge status-failed">
-                            <i class="bi bi-x-circle-fill"></i> 失败
-                        </span>
-                    {% elif release.build_state == 'BUILDING' %}
-                        <span class="status-badge status-building">
-                            <span class="spinner-border spinner-border-sm me-1"></span> 构建中
-                        </span>
-                    {% elif release.build_state == 'PENDING' %}
-                        <span class="status-badge status-pending">
-                            <i class="bi bi-clock-fill"></i> 待构建
-                        </span>
-                    {% else %}
-                        <span class="status-badge status-unknown">
-                            <i class="bi bi-question-circle-fill"></i> {{ release.build_state }}
-                        </span>
-                    {% endif %}
-                </td>
-                <td class="text-center">
-                    <div class="btn-group" role="group">
-                        <button class="btn btn-sm btn-info-modern" 
-                                onclick="viewDetails({{ release.build_id }})"
-                                title="查看详情">
-                            <i class="bi bi-eye"></i>
-                        </button>
-                        <button class="btn btn-sm btn-warning-modern" 
-                                onclick="retryBuild({{ release.id }}, '{{ release.project_name }}')"
-                                title="重试构建">
-                            <i class="bi bi-arrow-clockwise"></i>
-                        </button>
-                        <button class="btn btn-sm btn-danger-modern" 
-                                onclick="abandonRelease({{ release.id }}, '{{ release.project_name }}')"
-                                title="放弃打包">
-                            <i class="bi bi-trash"></i>
-                        </button>
-                    </div>
-                </td>
-            </tr>
-            {% endfor %}
-        </tbody>
-    </table>
+    <div id="releasesContainer">
+        <!-- 加载中显示 -->
+        <div class="text-center py-5 loading-inline">
+            <div class="spinner-border text-primary" role="status" style="width: 3rem; height: 3rem;">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+            <p class="mt-3 text-muted">正在加载包列表...</p>
+        </div>
+    </div>
 </div>
-
-{% if not releases %}
-<div class="text-center py-5">
-    <i class="bi bi-inbox" style="font-size: 4rem; color: #ccc;"></i>
-    <p class="mt-3 text-muted">该主题下暂无包</p>
-</div>
-{% endif %}
 
 <style>
 .topic-header {
@@ -362,6 +275,13 @@
     border-width: 0.15em;
 }
 
+.loading-inline {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1rem;
+}
+
 /* 响应式优化 */
 @media (max-width: 1200px) {
     .modern-table {
@@ -386,15 +306,183 @@
 </style>
 
 <script>
+// 从URL获取topic_id
+const topicId = {{ topic_id }};
+
+// 页面加载时获取数据
+document.addEventListener('DOMContentLoaded', function() {
+    loadTopicDetail();
+});
+
+// 加载主题详情
+async function loadTopicDetail() {
+    try {
+        const response = await fetch(`/api/topics/${topicId}/detail`);
+        const result = await response.json();
+        
+        if (result.success && result.data) {
+            renderTopicHeader(result.data.topic);
+            renderReleases(result.data.releases);
+        } else {
+            throw new Error(result.message || '加载数据失败');
+        }
+    } catch (error) {
+        console.error('加载主题详情失败:', error);
+        document.getElementById('topicHeader').innerHTML = `
+            <div class="text-center py-3">
+                <i class="bi bi-exclamation-circle text-white" style="font-size: 3rem;"></i>
+                <p class="text-white mt-2">加载失败: ${error.message}</p>
+            </div>
+        `;
+        document.getElementById('releasesContainer').innerHTML = `
+            <div class="text-center py-5">
+                <i class="bi bi-exclamation-circle text-danger" style="font-size: 4rem;"></i>
+                <p class="mt-3 text-muted">加载失败: ${error.message}</p>
+                <button class="btn btn-primary" onclick="location.reload()">
+                    <i class="bi bi-arrow-clockwise me-1"></i>重新加载
+                </button>
+            </div>
+        `;
+    }
+}
+
+// 渲染主题头部信息
+function renderTopicHeader(topic) {
+    const headerHTML = `
+        <div class="topic-header-content">
+            <h2 class="mb-2">
+                <i class="bi bi-layers-fill text-white me-2"></i>${topic.name}
+            </h2>
+            <p class="text-white-50 mb-3">${topic.description || '无描述'}</p>
+            <div class="topic-meta">
+                <span class="meta-badge">
+                    <i class="bi bi-calendar3"></i> ${topic.create_time}
+                </span>
+                <span class="meta-badge">
+                    <i class="bi bi-person-fill"></i> ${topic.creator_name}
+                </span>
+            </div>
+        </div>
+    `;
+    document.getElementById('topicHeader').innerHTML = headerHTML;
+}
+
+// 渲染包列表
+function renderReleases(releases) {
+    const container = document.getElementById('releasesContainer');
+    
+    if (!releases || releases.length === 0) {
+        container.innerHTML = `
+            <div class="text-center py-5">
+                <i class="bi bi-inbox" style="font-size: 4rem; color: #ccc;"></i>
+                <p class="mt-3 text-muted">该主题下暂无包</p>
+            </div>
+        `;
+        return;
+    }
+    
+    let tableHTML = `
+        <div class="table-container">
+            <table class="modern-table">
+                <thead>
+                    <tr>
+                        <th><i class="bi bi-box-seam"></i> 包名</th>
+                        <th><i class="bi bi-diagram-3"></i> 分支</th>
+                        <th><i class="bi bi-tag"></i> 标签</th>
+                        <th><i class="bi bi-hash"></i> Commit</th>
+                        <th><i class="bi bi-cpu"></i> 架构</th>
+                        <th><i class="bi bi-activity"></i> 构建状态</th>
+                        <th class="text-center"><i class="bi bi-gear"></i> 操作</th>
+                    </tr>
+                </thead>
+                <tbody>
+    `;
+    
+    releases.forEach(release => {
+        const buildStateHTML = getStatusBadge(release.build_state);
+        const commitHash = release.commit ? release.commit.substring(0, 10) : 'N/A';
+        
+        tableHTML += `
+            <tr>
+                <td>
+                    <div class="package-cell">
+                        <strong>${release.project_name}</strong>
+                        ${release.project_name !== release.source_pkg_name ? `
+                        <small class="text-muted d-block">
+                            <i class="bi bi-arrow-return-right"></i> ${release.source_pkg_name}
+                        </small>
+                        ` : ''}
+                    </div>
+                </td>
+                <td>
+                    <span class="badge-modern badge-branch">${release.branch}</span>
+                </td>
+                <td>
+                    <span class="badge-modern badge-tag">${release.tag}</span>
+                </td>
+                <td>
+                    <code class="commit-hash">${commitHash}</code>
+                </td>
+                <td>
+                    <span class="badge-modern badge-arch">${release.arches}</span>
+                </td>
+                <td>
+                    ${buildStateHTML}
+                </td>
+                <td class="text-center">
+                    <div class="btn-group" role="group">
+                        <button class="btn btn-sm btn-info-modern" 
+                                onclick="viewDetails(${release.build_id})"
+                                title="查看详情">
+                            <i class="bi bi-eye"></i>
+                        </button>
+                        <button class="btn btn-sm btn-warning-modern" 
+                                onclick="retryBuild(${release.id}, '${release.project_name}')"
+                                title="重试构建">
+                            <i class="bi bi-arrow-clockwise"></i>
+                        </button>
+                        <button class="btn btn-sm btn-danger-modern" 
+                                onclick="abandonRelease(${release.id}, '${release.project_name}')"
+                                title="放弃打包">
+                            <i class="bi bi-trash"></i>
+                        </button>
+                    </div>
+                </td>
+            </tr>
+        `;
+    });
+    
+    tableHTML += `
+                </tbody>
+            </table>
+        </div>
+    `;
+    
+    container.innerHTML = tableHTML;
+}
+
+// 根据构建状态返回对应的HTML
+function getStatusBadge(buildState) {
+    const statusMap = {
+        'SUCCESS': '<span class="status-badge status-success"><i class="bi bi-check-circle-fill"></i> 成功</span>',
+        'FAILED': '<span class="status-badge status-failed"><i class="bi bi-x-circle-fill"></i> 失败</span>',
+        'BUILDING': '<span class="status-badge status-building"><span class="spinner-border spinner-border-sm me-1"></span> 构建中</span>',
+        'PENDING': '<span class="status-badge status-pending"><i class="bi bi-clock-fill"></i> 待构建</span>'
+    };
+    
+    return statusMap[buildState] || `<span class="status-badge status-unknown"><i class="bi bi-question-circle-fill"></i> ${buildState}</span>`;
+}
+
+// 查看构建详情
 function viewDetails(buildId) {
     if (!buildId || buildId === 0) {
         alert('该包尚未开始构建');
         return;
     }
-    // 跳转到Shuttle构建详情页面
     window.open(`https://shuttle.uniontech.com/#/tasks/task?taskid=${buildId}`, '_blank');
 }
 
+// 重试构建
 function retryBuild(releaseId, projectName) {
     if (!confirm(`确定要重试构建 ${projectName} 吗？`)) {
         return;
@@ -417,6 +505,7 @@ function retryBuild(releaseId, projectName) {
     });
 }
 
+// 放弃打包
 function abandonRelease(releaseId, projectName) {
     if (!confirm(`确定要放弃打包 ${projectName} 吗？`)) {
         return;

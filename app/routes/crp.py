@@ -21,11 +21,21 @@ def topics():
 @crp_bp.route('/topics/<int:topic_id>')
 def topic_detail(topic_id):
     """CRP主题详情页面"""
+    # 只返回空页面，数据通过API异步加载
+    return render_template('crp_topic_detail.html', topic_id=topic_id)
+
+
+@crp_bp.route('/api/topics/<int:topic_id>/detail', methods=['GET'])
+def api_topic_detail(topic_id):
+    """获取主题详情数据的API"""
     try:
         # 获取token
         token = CRPService.get_token()
         if not token:
-            return render_template('error.html', error='CRP登录失败，请检查LDAP账号密码'), 401
+            return jsonify({
+                'success': False,
+                'message': 'CRP登录失败，请检查LDAP账号密码'
+            }), 401
         
         # 获取配置
         config = GlobalConfig.get_config()
@@ -51,16 +61,28 @@ def topic_detail(topic_id):
                 break
         
         if not topic:
-            return render_template('error.html', error='主题未找到'), 404
+            return jsonify({
+                'success': False,
+                'message': '主题未找到'
+            }), 404
         
         # 获取包列表
         releases = CRPService.list_topic_releases(token, topic_id)
         
-        return render_template('crp_topic_detail.html', topic=topic, releases=releases)
+        return jsonify({
+            'success': True,
+            'data': {
+                'topic': topic,
+                'releases': releases
+            }
+        })
         
     except Exception as e:
         logger.error(f"获取主题详情失败: {str(e)}", exc_info=True)
-        return render_template('error.html', error=f'获取主题详情失败: {str(e)}'), 500
+        return jsonify({
+            'success': False,
+            'message': f'获取主题详情失败: {str(e)}'
+        }), 500
 
 
 @crp_bp.route('/api/topics', methods=['GET'])

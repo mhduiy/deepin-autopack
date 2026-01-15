@@ -11,50 +11,71 @@ logger = logging.getLogger(__name__)
 @monitor_bp.route('/monitor')
 def monitor():
     """提交监控页面"""
-    # 只显示已就绪的项目
-    projects = Project.query.filter_by(repo_status='ready').all()
-    
-    project_data = []
-    for project in projects:
-        # 获取当前版本
-        current_version = None
-        if project.local_repo_path:
-            current_version = ChangelogService.get_current_version(project.local_repo_path)
+    # 只返回空页面，数据通过API异步加载
+    return render_template('monitor.html')
+
+@monitor_bp.route('/api/monitor/data', methods=['GET'])
+def monitor_data():
+    """获取监控数据的API"""
+    try:
+        # 只显示已就绪的项目
+        projects = Project.query.filter_by(repo_status='ready').all()
         
-        # 获取 changelog 最后修改的 commit（优先）
-        changelog_commit = None
-        if project.local_repo_path:
-            changelog_commit = ChangelogService.get_changelog_last_commit(project.local_repo_path)
+        project_data = []
+        for project in projects:
+            # 获取当前版本
+            current_version = None
+            if project.local_repo_path:
+                current_version = ChangelogService.get_current_version(project.local_repo_path)
+            
+            # 获取 changelog 最后修改的 commit（优先）
+            changelog_commit = None
+            if project.local_repo_path:
+                changelog_commit = ChangelogService.get_changelog_last_commit(project.local_repo_path)
+            
+            # 获取最新 tag（降级）
+            latest_tag = RepoService.get_latest_tag(project)
+            
+            # 确定起始点：优先使用 changelog commit，否则使用 tag
+            since_point = changelog_commit or latest_tag
+            since_type = 'changelog' if changelog_commit else 'tag'
+            
+            # 获取新增提交
+            new_commits_count = 0
+            new_commits = []
+            if since_point:
+                new_commits_count, new_commits = RepoService.get_commits_since(project, since_point)
+            
+            # 获取最新提交
+            latest_commit = RepoService.get_latest_commit(project)
+            
+            project_data.append({
+                'project': {
+                    'id': project.id,
+                    'name': project.name,
+                    'github_branch': project.github_branch,
+                    'gerrit_branch': project.gerrit_branch
+                },
+                'current_version': current_version,
+                'latest_tag': latest_tag,
+                'changelog_commit': changelog_commit,
+                'since_point': since_point,
+                'since_type': since_type,
+                'new_commits_count': new_commits_count,
+                'new_commits': new_commits,
+                'latest_commit': latest_commit
+            })
         
-        # 获取最新 tag（降级）
-        latest_tag = RepoService.get_latest_tag(project)
-        
-        # 确定起始点：优先使用 changelog commit，否则使用 tag
-        since_point = changelog_commit or latest_tag
-        since_type = 'changelog' if changelog_commit else 'tag'
-        
-        # 获取新增提交
-        new_commits_count = 0
-        new_commits = []
-        if since_point:
-            new_commits_count, new_commits = RepoService.get_commits_since(project, since_point)
-        
-        # 获取最新提交
-        latest_commit = RepoService.get_latest_commit(project)
-        
-        project_data.append({
-            'project': project,
-            'current_version': current_version,
-            'latest_tag': latest_tag,
-            'changelog_commit': changelog_commit,
-            'since_point': since_point,
-            'since_type': since_type,
-            'new_commits_count': new_commits_count,
-            'new_commits': new_commits,
-            'latest_commit': latest_commit
+        return jsonify({
+            'success': True,
+            'data': project_data
         })
-    
-    return render_template('monitor.html', projects=project_data)
+    except Exception as e:
+        logger.error(f"获取监控数据失败: {str(e)}", exc_info=True)
+        return jsonify({
+            'success': False,
+            'message': str(e)
+        }), 500
 
 @monitor_bp.route('/monitor/projects/<int:project_id>/refresh', methods=['POST'])
 def refresh_project(project_id):
