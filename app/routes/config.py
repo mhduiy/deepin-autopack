@@ -122,38 +122,38 @@ def refresh_crp_token():
         return jsonify({'success': False, 'message': '请先配置 LDAP 账号和密码'}), 400
     
     try:
-        # 查找刷新脚本
-        script_path = os.path.expanduser('~/Dev/dev-tool/gen_pwd.py')
-        if not os.path.exists(script_path):
-            # 尝试其他可能的路径
-            alt_paths = [
-                os.path.expanduser('~/Dev/dev-tool/gen_pwd'),
-                os.path.expanduser('~/Dev/dev-tool/gen_token.py'),
-                os.path.expanduser('~/Dev/dev-tool/refresh_token.py'),
-            ]
-            for path in alt_paths:
-                if os.path.exists(path):
-                    script_path = path
-                    break
-            else:
-                return jsonify({'success': False, 'message': '未找到刷新脚本，请检查 ~/Dev/dev-tool/ 目录'})
+        # 使用项目中的 gen-crp-pwd.py 脚本
+        project_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+        script_path = os.path.join(project_dir, 'gen-crp-pwd.py')
         
-        # 执行脚本刷新token
+        if not os.path.exists(script_path):
+            return jsonify({'success': False, 'message': f'未找到加密脚本: {script_path}'})
+        
+        # 执行脚本生成加密密码
         result = subprocess.run(
-            ['python3', script_path, config.ldap_username, config.ldap_password],
+            ['python3', script_path],
+            input=config.ldap_password,
             capture_output=True,
             text=True,
             timeout=30
         )
         
         if result.returncode == 0 and result.stdout:
-            # 假设脚本输出的是新token
-            new_token = result.stdout.strip()
-            config.crp_token = new_token
-            db.session.commit()
-            return jsonify({'success': True, 'message': 'Token 刷新成功'})
+            # 脚本输出的是加密后的密码
+            encrypted_password = result.stdout.strip()
+            
+            # 使用加密密码登录获取token
+            from app.services.crp_service import CRPService
+            new_token = CRPService.fetch_token(config.ldap_username, encrypted_password)
+            
+            if new_token:
+                config.crp_token = new_token
+                db.session.commit()
+                return jsonify({'success': True, 'message': 'Token 刷新成功'})
+            else:
+                return jsonify({'success': False, 'message': 'CRP登录失败，请检查账号密码'})
         else:
-            error_msg = result.stderr if result.stderr else '脚本执行失败'
+            error_msg = result.stderr if result.stderr else '密码加密失败'
             return jsonify({'success': False, 'message': error_msg})
     except subprocess.TimeoutExpired:
         return jsonify({'success': False, 'message': '刷新超时，请稍后重试'})
