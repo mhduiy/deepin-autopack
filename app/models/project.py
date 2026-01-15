@@ -17,6 +17,7 @@ class Project(db.Model):
     local_repo_path = db.Column(db.String(500), nullable=True)  # 本地仓库路径
     repo_status = db.Column(db.String(20), default='pending')  # pending/cloning/ready/error
     repo_error = db.Column(db.Text, nullable=True)  # 错误信息
+    crp_project_name = db.Column(db.String(100), nullable=True)  # CRP项目名称（默认为name-v25）
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, onupdate=datetime.utcnow)
 
@@ -32,6 +33,7 @@ class Project(db.Model):
             'github_url': self.github_url,
             'github_branch': self.github_branch,
             'last_commit_hash': self.last_commit_hash,
+            'crp_project_name': self.crp_project_name or f"{self.name}-v25",  # 默认添加-v25后缀
             'created_at': self.created_at,
             'updated_at': self.updated_at
         }

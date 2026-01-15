@@ -526,25 +526,25 @@
                                 </label>
                             </div>
                             <div class="form-check form-check-inline arch-checkbox">
-                                <input class="form-check-input" type="checkbox" id="arch-arm64" value="arm64">
+                                <input class="form-check-input" type="checkbox" id="arch-arm64" value="arm64" checked>
                                 <label class="form-check-label" for="arch-arm64">
                                     <i class="bi bi-phone me-1"></i>arm64
                                 </label>
                             </div>
                             <div class="form-check form-check-inline arch-checkbox">
-                                <input class="form-check-input" type="checkbox" id="arch-loong64" value="loong64">
+                                <input class="form-check-input" type="checkbox" id="arch-loong64" value="loong64" checked>
                                 <label class="form-check-label" for="arch-loong64">
                                     <i class="bi bi-cpu me-1"></i>loong64
                                 </label>
                             </div>
                             <div class="form-check form-check-inline arch-checkbox">
-                                <input class="form-check-input" type="checkbox" id="arch-sw64" value="sw64">
+                                <input class="form-check-input" type="checkbox" id="arch-sw64" value="sw64" checked>
                                 <label class="form-check-label" for="arch-sw64">
                                     <i class="bi bi-cpu me-1"></i>sw64
                                 </label>
                             </div>
                             <div class="form-check form-check-inline arch-checkbox">
-                                <input class="form-check-input" type="checkbox" id="arch-mips64el" value="mips64el">
+                                <input class="form-check-input" type="checkbox" id="arch-mips64el" value="mips64el" checked>
                                 <label class="form-check-label" for="arch-mips64el">
                                     <i class="bi bi-cpu me-1"></i>mips64el
                                 </label>
@@ -1121,7 +1121,14 @@ async function refreshProject(projectId) {
 
 // 刷新所有项目
 async function refreshAllProjects() {
-    if (!confirm('确定要刷新所有项目吗？这可能需要一些时间。')) {
+    const confirmed = await customConfirm(
+        '确定要刷新所有项目吗？这可能需要一些时间。',
+        '刷新所有项目',
+        'arrow-clockwise',
+        'info'
+    );
+    
+    if (!confirmed) {
         return;
     }
     

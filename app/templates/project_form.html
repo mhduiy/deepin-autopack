@@ -120,6 +120,17 @@
                         <div class="form-text">用于追踪自上次打包以来的新提交</div>
                     </div>
 
+                    <div class="mb-4">
+                        <label for="crp_project_name" class="form-label">CRP 项目名称（可选）</label>
+                        <input type="text" 
+                               class="form-control" 
+                               id="crp_project_name" 
+                               name="crp_project_name" 
+                               value="{{ project.crp_project_name if project else '' }}"
+                               placeholder="留空则自动使用：项目名-v25">
+                        <div class="form-text">CRP 平台上的项目名称。如果为空，将默认使用 <code>项目名-v25</code> 格式（如：dtk6log-v25）</div>
+                    </div>
+
                     <!-- 按钮组 -->
                     <div class="d-flex justify-content-end gap-2 mt-4 pt-3 border-top">
                         <a href="{{ url_for('project.project_list') }}" class="btn btn-outline-secondary">

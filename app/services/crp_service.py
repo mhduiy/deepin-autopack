@@ -231,6 +231,62 @@ fe9YvvT0lqy2BtBpaQIDAQAB
             return []
     
     @staticmethod
+    def list_projects(token: str, project_name: str, branch_id: int) -> List[Dict]:
+        """
+        根据项目名和分支ID查询项目列表
+        
+        Args:
+            token: CRP Token
+            project_name: 项目名称
+            branch_id: 分支ID
+            
+        Returns:
+            项目列表，每个项目包含ID、Name、Branch等信息
+        """
+        try:
+            url = f"{CRPService.BASE_URL}/project"
+            headers = {
+                "Authorization": f"Bearer {token}",
+                "Content-Type": "application/json"
+            }
+            data = {
+                "page": 0,
+                "perPage": 0,
+                "projectGroupID": 0,
+                "newCommit": False,
+                "archived": False,
+                "branchID": branch_id,
+                "name": project_name
+            }
+            
+            logger.info(f"调用CRP项目列表API: name={project_name}, branch_id={branch_id}")
+            logger.debug(f"请求URL: {url}")
+            logger.debug(f"请求数据: {data}")
+            
+            response = requests.post(url, headers=headers, json=data, timeout=30)
+            response.raise_for_status()
+            
+            result = response.json()
+            projects = result.get('Projects', [])
+            if projects is None:
+                logger.warning(f"CRP返回的Projects字段为None，完整响应: {result}")
+                return []
+            
+            logger.info(f"查询到{len(projects)}个匹配的项目: name={project_name}, branch_id={branch_id}")
+            return projects if projects else []
+            
+        except requests.exceptions.RequestException as e:
+            logger.error(f"查询项目列表失败: {str(e)}")
+            if hasattr(e, 'response') and e.response:
+                logger.error(f"响应内容: {e.response.text}")
+            return []
+        except Exception as e:
+            logger.error(f"查询项目列表异常: {str(e)}")
+            import traceback
+            logger.error(traceback.format_exc())
+            return []
+    
+    @staticmethod
     def delete_release(token: str, release_id: int) -> bool:
         """
         放弃一个包（删除release）
@@ -315,34 +371,92 @@ fe9YvvT0lqy2BtBpaQIDAQAB
             成功返回包含build_id的字典，失败返回None
         """
         try:
+            # 如果project_id为0，尝试自动解析
+            resolved_project_id = project_id
+            if project_id == 0:
+                logger.info(f"========== 开始自动解析ProjectID ==========")
+                logger.info(f"请求参数: project_name={project_name}, branch={branch}, branch_id={branch_id}")
+                
+                # 方法1: 先尝试从主题的已有release中找到项目ID
+                releases = CRPService.list_topic_releases(token, topic_id)
+                logger.info(f"从主题{topic_id}获取到{len(releases)}个release")
+                for release in releases:
+                    logger.debug(f"  Release: ProjectName={release.get('ProjectName')}, Branch={release.get('Branch')}, ProjectID={release.get('ProjectID')}")
+                    if release.get('ProjectName') == project_name and release.get('Branch') == branch:
+                        resolved_project_id = release.get('ProjectID', 0)
+                        logger.info(f"✓ 从主题releases中找到ProjectID: {resolved_project_id}")
+                        break
+                
+                # 方法2: 如果还是0，通过项目列表API查询
+                if resolved_project_id == 0:
+                    logger.info(f"从releases中未找到，尝试通过项目列表API查询...")
+                    logger.info(f"查询参数: name={project_name}, branch_id={branch_id}")
+                    projects = CRPService.list_projects(token, project_name, branch_id)
+                    logger.info(f"项目列表API返回: {len(projects) if projects else 0}个项目")
+                    if projects:
+                        for proj in projects:
+                            logger.info(f"  项目: ID={proj.get('ID')}, Name={proj.get('Name')}, Branch={proj.get('Branch')}")
+                    if projects and len(projects) > 0:
+                        resolved_project_id = projects[0].get('ID', 0)
+                        logger.info(f"✓ 从项目列表中找到ProjectID: {resolved_project_id}")
+                
+                if resolved_project_id == 0:
+                    logger.warning(f"✗ 无法自动解析ProjectID，将使用0（可能导致CRP返回500错误）")
+                    logger.warning(f"   请检查: 1) 项目名称是否正确 2) 分支ID是否正确 3) CRP中是否存在此项目")
+                logger.info(f"==========================================")
+            
             url = f"{CRPService.BASE_URL}/topics/{topic_id}/new_release"
             headers = {
                 "Authorization": f"Bearer {token}",
                 "Content-Type": "application/json"
             }
+            # 确保changelog是字符串，并放在列表中
+            changelog_list = [changelog] if changelog else [""]
+            
             data = {
                 "Arches": arches,
                 "BaseTag": None,
                 "Branch": branch,
                 "BuildID": 0,
                 "BuildState": None,
-                "Changelog": [changelog] if changelog else [],
+                "Changelog": changelog_list,
                 "Commit": commit,
                 "History": None,
                 "ID": 0,
-                "ProjectID": project_id,
+                "ProjectID": resolved_project_id,
                 "ProjectName": project_name,
                 "ProjectRepoUrl": None,
                 "SlaveNode": None,
                 "Tag": tag,
                 "TagSuffix": None,
                 "TopicID": topic_id,
-                "TopicType": "test",  # 默认test类型
+                "TopicType": "test",
                 "ChangeLogMode": True,
                 "RepoType": "deb",
                 "Custom": True,
                 "BranchID": str(branch_id)
             }
+            
+            # 检查topic中是否已存在相同project和branch的release，如果存在则先删除
+            # 使用模糊匹配，因为CRP中的项目名可能有后缀（如 dtk6log vs dtk6log-v25）
+            existing_releases = CRPService.list_topic_releases(token, topic_id)
+            for release in existing_releases:
+                release_project = release.get('project_name', '')
+                release_branch = release.get('branch', '')
+                
+                # 模糊匹配：release的项目名以我们的项目名开头，且分支相同
+                if release_project.startswith(project_name) and release_branch == branch:
+                    release_id = release.get('id')
+                    logger.warning(f"发现匹配的release(模糊): id={release_id}, "
+                                 f"project={release_project} (匹配 {project_name}), branch={branch}，将先删除")
+                    if CRPService.delete_release(token, release_id):
+                        logger.info(f"成功删除旧release: {release_id}")
+                    else:
+                        logger.warning(f"删除旧release失败: {release_id}，继续尝试创建新release")
+                    break
+            
+            logger.info(f"准备提交CRP打包: ProjectID={resolved_project_id}, TopicID={topic_id}")
+            logger.debug(f"请求数据: {data}")
             
             response = requests.post(
                 url,
@@ -350,16 +464,38 @@ fe9YvvT0lqy2BtBpaQIDAQAB
                 json=data,
                 timeout=30
             )
-            response.raise_for_status()
             
-            result = response.json()
-            logger.info(f"CRP打包任务提交成功: project={project_name}, commit={commit[:8]}")
-            logger.debug(f"CRP响应: {result}")
+            # CRP成功时返回201 Created，响应内容是整数ID或JSON对象
+            if response.status_code not in [200, 201]:
+                logger.error(f"CRP API返回错误状态码: {response.status_code}")
+                logger.error(f"响应内容: {response.text}")
+                response.raise_for_status()
+            
+            # 解析响应 - 可能是整数ID或JSON对象
+            try:
+                result = response.json()
+                # 如果响应是整数，直接作为build_id
+                if isinstance(result, int):
+                    build_id = result
+                    logger.info(f"CRP打包任务提交成功: build_id={build_id}")
+                else:
+                    # 如果是JSON对象，从中提取ID
+                    build_id = result.get('ID', 0)
+                    logger.info(f"CRP打包任务提交成功: project={project_name}, commit={commit[:8]}")
+                    logger.debug(f"CRP响应: {result}")
+            except:
+                # 如果JSON解析失败，尝试作为文本解析为整数
+                try:
+                    build_id = int(response.text.strip())
+                    logger.info(f"CRP打包任务提交成功: build_id={build_id}")
+                except:
+                    logger.error(f"无法解析CRP响应: {response.text}")
+                    build_id = 0
             
             # 构建返回结果
             return {
                 'success': True,
-                'build_id': result.get('ID', 0),
+                'build_id': build_id,
                 'url': f"https://crp.uniontech.com/topics/{topic_id}",
                 'message': '打包任务已提交'
             }

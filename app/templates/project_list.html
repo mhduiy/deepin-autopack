@@ -464,8 +464,15 @@ function pollRepoStatus(projectId) {
     }, 2000);
 }
 
-function deleteProject(projectId, projectName) {
-    if (!confirm(`确定要删除项目 "${projectName}" 吗？此操作不可恢复。`)) {
+async function deleteProject(projectId, projectName) {
+    const confirmed = await customConfirm(
+        `确定要删除项目 "${projectName}" 吗？此操作不可恢复。`,
+        '删除项目',
+        'trash',
+        'danger'
+    );
+    
+    if (!confirmed) {
         return;
     }
 

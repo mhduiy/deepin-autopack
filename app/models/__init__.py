@@ -16,6 +16,7 @@ class Project(db.Model):
     local_repo_path = db.Column(db.String(500), comment='本地仓库路径')
     repo_status = db.Column(db.String(20), default='pending', comment='仓库状态: pending/cloning/ready/error')
     repo_error = db.Column(db.Text, comment='错误信息')
+    crp_project_name = db.Column(db.String(100), comment='CRP项目名称（默认为name-v25）')
     
     def to_dict(self):
         """转换为字典"""
@@ -30,7 +31,8 @@ class Project(db.Model):
             'last_commit_hash': self.last_commit_hash,
             'local_repo_path': self.local_repo_path,
             'repo_status': self.repo_status,
-            'repo_error': self.repo_error
+            'repo_error': self.repo_error,
+            'crp_project_name': self.crp_project_name or f"{self.name}-v25"
         }
     
     def __repr__(self):

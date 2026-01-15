@@ -53,6 +53,11 @@ class GerritService:
         url = f"{self.base_url}/a/{endpoint}"
         
         try:
+            # 调试日志：打印完整URL
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.info(f"Gerrit API 请求: {method} {url}")
+            
             response = self.session.request(
                 method=method,
                 url=url,
@@ -62,9 +67,10 @@ class GerritService:
             )
 
             if response.status_code not in [200, 201, 204]:
+                logger.error(f"Gerrit API 错误: {response.status_code}, URL: {url}, Response: {response.text[:200]}")
                 return {
                     'success': False,
-                    'message': f'Gerrit API 返回错误，HTTP 状态码: {response.status_code}',
+                    'message': f'Gerrit API 返回错误，HTTP 状态码: {response.status_code}，URL: {url}',
                     'data': None,
                     'status_code': response.status_code
                 }
@@ -106,11 +112,12 @@ class GerritService:
         获取项目信息
         
         Args:
-            project_name: 项目名称
+            project_name: 项目名称（可能包含 /，如 snipe/dde-appearance）
             
         Returns:
             包含项目信息的字典
         """
+        # 项目名中的 / 需要编码为 %2F
         endpoint = f"projects/{requests.utils.quote(project_name, safe='')}"
         return self._request('GET', endpoint)
     
@@ -119,11 +126,12 @@ class GerritService:
         获取项目所有分支
         
         Args:
-            project_name: 项目名称
+            project_name: 项目名称（可能包含 /，如 snipe/dde-appearance）
             
         Returns:
             包含分支列表的字典
         """
+        # 项目名中的 / 需要编码为 %2F
         endpoint = f"projects/{requests.utils.quote(project_name, safe='')}/branches/"
         return self._request('GET', endpoint)
     
@@ -132,13 +140,24 @@ class GerritService:
         获取指定分支信息
         
         Args:
-            project_name: 项目名称
-            branch_name: 分支名称
+            project_name: 项目名称（可能包含 /，如 snipe/dde-appearance）
+            branch_name: 分支名称（如 master, upstream/master 等）
             
         Returns:
             包含分支信息的字典（包括最新 revision）
         """
-        endpoint = f"projects/{requests.utils.quote(project_name, safe='')}/branches/{requests.utils.quote(branch_name, safe='')}"
+        # Gerrit API 中分支名需要用 refs/heads/ 前缀
+        # 项目名和分支名中的 / 都需要编码为 %2F
+        if not branch_name.startswith('refs/'):
+            branch_ref = f"refs/heads/{branch_name}"
+        else:
+            branch_ref = branch_name
+        
+        # URL编码：项目名和分支引用都完全编码（包括 /）
+        encoded_project = requests.utils.quote(project_name, safe='')
+        encoded_branch = requests.utils.quote(branch_ref, safe='')
+        
+        endpoint = f"projects/{encoded_project}/branches/{encoded_branch}"
         return self._request('GET', endpoint)
     
     # ==================== 提交/变更相关接口 ====================

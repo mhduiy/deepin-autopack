@@ -365,6 +365,68 @@
         });
     </script>
     
+    <!-- 自定义确认对话框 -->
+    <div class="modal fade" id="customConfirmModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content" style="border: none; border-radius: 16px; box-shadow: 0 10px 40px rgba(0,0,0,0.2);">
+                <div class="modal-header" style="border-bottom: 1px solid #e9ecef; padding: 1.5rem;">
+                    <h5 class="modal-title" id="customConfirmTitle" style="font-weight: 600; color: #333;">
+                        <i class="bi bi-question-circle-fill text-warning me-2"></i>
+                        确认操作
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="关闭"></button>
+                </div>
+                <div class="modal-body" id="customConfirmBody" style="padding: 1.5rem; font-size: 1rem; color: #555; white-space: pre-wrap;">
+                    确定要执行此操作吗？
+                </div>
+                <div class="modal-footer" style="border-top: 1px solid #e9ecef; padding: 1rem 1.5rem;">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal" style="border-radius: 8px; padding: 0.5rem 1.5rem;">
+                        <i class="bi bi-x-circle me-1"></i>
+                        取消
+                    </button>
+                    <button type="button" class="btn btn-primary" id="customConfirmOk" style="border-radius: 8px; padding: 0.5rem 1.5rem;">
+                        <i class="bi bi-check-circle me-1"></i>
+                        确定
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+    // 全局自定义确认对话框函数
+    window.customConfirm = function(message, title = '确认操作', icon = 'question-circle-fill', iconColor = 'warning') {
+        return new Promise((resolve) => {
+            const modal = new bootstrap.Modal(document.getElementById('customConfirmModal'));
+            const titleEl = document.getElementById('customConfirmTitle');
+            const bodyEl = document.getElementById('customConfirmBody');
+            const okBtn = document.getElementById('customConfirmOk');
+            
+            // 设置图标和颜色
+            const iconHtml = `<i class="bi bi-${icon} text-${iconColor} me-2"></i>`;
+            titleEl.innerHTML = iconHtml + title;
+            bodyEl.textContent = message;
+            
+            // 移除旧的事件监听器
+            const newOkBtn = okBtn.cloneNode(true);
+            okBtn.parentNode.replaceChild(newOkBtn, okBtn);
+            
+            // 添加新的事件监听器
+            newOkBtn.addEventListener('click', () => {
+                modal.hide();
+                resolve(true);
+            });
+            
+            // 取消或关闭时返回false
+            document.getElementById('customConfirmModal').addEventListener('hidden.bs.modal', () => {
+                resolve(false);
+            }, { once: true });
+            
+            modal.show();
+        });
+    };
+    </script>
+    
     {% block scripts %}{% endblock %}
 </body>
 </html>

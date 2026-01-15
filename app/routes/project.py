@@ -58,6 +58,7 @@ def project_create():
                 github_url=request.form.get('github_url'),
                 github_branch=request.form.get('github_branch'),
                 last_commit_hash=request.form.get('last_commit_hash'),
+                crp_project_name=request.form.get('crp_project_name') or None,  # CRP项目名，默认为None（使用name-v25）
                 repo_status='pending'
             )
             db.session.add(project)
@@ -88,6 +89,7 @@ def project_edit(id):
             project.github_url = request.form.get('github_url')
             project.github_branch = request.form.get('github_branch')
             project.last_commit_hash = request.form.get('last_commit_hash')
+            project.crp_project_name = request.form.get('crp_project_name') or None
             
             db.session.commit()
             flash(f'项目 {project.name} 更新成功！', 'success')

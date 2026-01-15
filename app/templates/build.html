@@ -560,6 +560,7 @@
 
 <script>
 let currentFilter = 'all';
+let currentTasks = []; // 保存当前任务列表
 
 // 页面加载时获取任务列表
 document.addEventListener('DOMContentLoaded', function() {
@@ -583,6 +584,7 @@ async function loadTasks() {
         }
 
         const tasks = result.data || [];
+        currentTasks = tasks; // 保存任务列表
         
         // 更新统计
         updateStats(tasks);
@@ -877,9 +879,26 @@ function viewTaskDetail(taskId) {
 }
 
 // 重试任务（从失败步骤继续）
-function retryTask(taskId) {
-    if (confirm(`确定要重试任务 #${taskId} 吗？\n将从失败或取消的步骤继续执行。`)) {
-        fetch(`/api/tasks/${taskId}/retry`, {
+async function retryTask(taskId) {
+    // 获取任务数据以确定失败步骤
+    const task = currentTasks.find(t => t.id === taskId);
+    const failedStep = task ? task.current_step : null;
+    
+    const stepInfo = failedStep !== null ? `从步骤 ${failedStep} 继续执行` : `继续执行`;
+    const confirmed = await customConfirm(
+        `将${stepInfo}，失败的步骤会被重新执行。`,
+        `重试任务 #${taskId}`,
+        'arrow-repeat',
+        'primary'
+    );
+    
+    if (confirmed) {
+        // 从失败的步骤继续（传递当前步骤号）
+        const url = failedStep !== null 
+            ? `/api/tasks/${taskId}/retry?from_step=${failedStep}`
+            : `/api/tasks/${taskId}/retry`;
+            
+        fetch(url, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -894,7 +913,7 @@ function retryTask(taskId) {
             return response.json();
         })
         .then(data => {
-            console.log('任务已重新启动:', data);
+            console.log('任务已重试:', data);
             // 刷新任务列表
             loadTasks();
         })
@@ -906,8 +925,15 @@ function retryTask(taskId) {
 }
 
 // 重新开始任务（从第一步开始）
-function restartTask(taskId) {
-    if (confirm(`确定要重新开始任务 #${taskId} 吗？\n将从第一步重新执行整个流程，所有步骤都会被重置。`)) {
+async function restartTask(taskId) {
+    const confirmed = await customConfirm(
+        `将从第一步重新执行整个流程，所有步骤都会被重置。`,
+        `重新开始任务 #${taskId}`,
+        'arrow-clockwise',
+        'danger'
+    );
+    
+    if (confirmed) {
         fetch(`/api/tasks/${taskId}/retry?from_step=0`, {
             method: 'POST',
             headers: {
@@ -936,24 +962,51 @@ function restartTask(taskId) {
 }
 
 // 暂停任务
-function pauseTask(taskId) {
-    if (confirm(`确定要暂停任务 #${taskId} 吗？`)) {
-        // TODO: 调用暂停API
-        alert(`暂停任务 #${taskId}\n（功能待实现）`);
+async function pauseTask(taskId) {
+    const confirmed = await customConfirm(
+        `任务将被暂停，可以稍后继续执行。`,
+        `暂停任务 #${taskId}`,
+        'pause-circle',
+        'warning'
+    );
+    
+    if (confirmed) {
+        fetch(`/api/tasks/${taskId}/pause`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            }
+        })
+        .then(response => {
+            if (!response.ok) {
+                return response.json().then(err => {
+                    throw new Error(err.error || '暂停失败');
+                });
+            }
+            return response.json();
+        })
+        .then(data => {
+            console.log('任务已暂停:', data);
+            loadTasks();
+        })
+        .catch(error => {
+            console.error('暂停任务失败:', error);
+            alert(`暂停任务失败：${error.message}`);
+        });
     }
 }
 
-// 继续任务
-function resumeTask(taskId) {
-    if (confirm(`确定要继续任务 #${taskId} 吗？`)) {
-        // TODO: 调用继续API
-        alert(`继续任务 #${taskId}\n（功能待实现）`);
-    }
-}
 
 // 取消任务
-function cancelTask(taskId) {
-    if (confirm(`确定要取消任务 #${taskId} 吗？\n任务将被标记为已取消状态，可以重新执行。`)) {
+async function cancelTask(taskId) {
+    const confirmed = await customConfirm(
+        `任务将被标记为已取消状态，可以重新执行。`,
+        `取消任务 #${taskId}`,
+        'x-circle',
+        'danger'
+    );
+    
+    if (confirmed) {
         fetch(`/api/tasks/${taskId}/cancel`, {
             method: 'POST',
             headers: {

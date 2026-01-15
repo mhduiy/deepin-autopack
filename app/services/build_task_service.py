@@ -666,7 +666,9 @@ class BuildExecutor:
             
             # 创建打包分支（GitHub项目需要）
             if self.project.github_url:
-                branch_name = f"dev-changelog-{self.task.version}"
+                # 将版本号中的非法字符替换为短横线（Git分支名不允许冒号、空格等字符）
+                safe_version = self.task.version.replace(':', '-').replace(' ', '-').replace('/', '-')
+                branch_name = f"dev-changelog-{safe_version}"
                 self.task.github_branch = branch_name
                 db.session.commit()
                 
@@ -704,9 +706,11 @@ class BuildExecutor:
             # 设置DEBEMAIL环境变量（从全局配置读取）
             from app.models import GlobalConfig
             config = GlobalConfig.query.first()
-            if config and config.maintainer_email:
-                os.environ['DEBEMAIL'] = config.maintainer_email
-                logger.info(f"设置DEBEMAIL: {config.maintainer_email}")
+            if config and config.maintainer_name and config.maintainer_email:
+                # DEBEMAIL格式: "维护者名字 <维护者邮箱>"
+                debemail = f"{config.maintainer_name} <{config.maintainer_email}>"
+                os.environ['DEBEMAIL'] = debemail
+                logger.info(f"设置DEBEMAIL: {debemail}")
             
             # 获取上一个版本（优先使用changelog版本）
             last_version = self._find_last_changelog_version(repo)
@@ -741,20 +745,32 @@ class BuildExecutor:
             try:
                 # 将commit信息按行分割，逐行添加到changelog
                 commits = commit_info.strip().split('\n')
-                for commit_msg in commits:
+                for idx, commit_msg in enumerate(commits):
                     if commit_msg.strip():
-                        subprocess.run(
-                            ['dch', '-v', self.task.version, commit_msg.strip()],
-                            check=True,
-                            capture_output=True,
-                            text=True
-                        )
-
-                        logger.warning(f"添加到changelog: {commit_msg.strip()}")
+                        # 第一条使用 -v 创建新版本，后续使用 -a 追加到当前版本
+                        if idx == 0:
+                            # 创建新版本
+                            subprocess.run(
+                                ['dch', '-v', self.task.version, '-D', 'unstable', commit_msg.strip()],
+                                check=True,
+                                capture_output=True,
+                                text=True
+                            )
+                            logger.info(f"创建新版本并添加: {commit_msg.strip()}")
+                        else:
+                            # 追加到当前版本
+                            subprocess.run(
+                                ['dch', '-a', commit_msg.strip()],
+                                check=True,
+                                capture_output=True,
+                                text=True
+                            )
+                            logger.info(f"追加到当前版本: {commit_msg.strip()}")
                 
                 step.log_message = (
                     f"Changelog已生成\n"
                     f"版本: {self.task.version}\n"
+                    f"发行版: unstable\n"
                     f"基于版本: {last_version if last_version else '首次发布'}\n"
                     f"包含 {len(commits)} 条变更记录"
                 )
@@ -855,7 +871,7 @@ class BuildExecutor:
             )
             
             # 保存commit hash
-            self.task.github_commit_hash = commit.hexsha
+            self.task.gerrit_commit_hash = commit.hexsha
             db.session.commit()
             
             logger.info(f"提交成功: task_id={self.task_id}, commit={commit.hexsha[:8]}")
@@ -883,14 +899,18 @@ class BuildExecutor:
                     raise Exception("未配置GitHub用户名，请在全局配置中设置github_username")
                 
                 # 获取上游仓库信息
-                # GitHub URL格式: https://github.com/owner/repo.git
-                upstream_url = self.project.github_url
+                # GitHub URL格式: https://github.com/owner/repo.git 或 https://github.com/owner/repo 或 https://github.com/owner/repo/
+                upstream_url = self.project.github_url.rstrip('/')  # 先去掉末尾斜杠
                 if upstream_url.endswith('.git'):
-                    upstream_url = upstream_url[:-4]
+                    upstream_url = upstream_url[:-4]  # 去掉.git后缀
                 
                 # 构建fork仓库URL
-                # 从 https://github.com/linuxdeepin/dde-shell.git 提取 repo名
+                # 从 https://github.com/linuxdeepin/dde-shell 提取 repo名
                 repo_name = upstream_url.split('/')[-1]
+                if not repo_name:
+                    raise Exception(f"无法从GitHub URL中提取仓库名: {self.project.github_url}")
+                
+                logger.info(f"解析GitHub URL: {self.project.github_url} -> repo_name={repo_name}")
                 fork_url = f"https://github.com/{config.github_username}/{repo_name}.git"
                 
                 logger.info(f"推送到fork仓库: {fork_url}")
@@ -977,14 +997,18 @@ class BuildExecutor:
                 raise Exception("未配置GitHub用户名")
             
             # 解析上游仓库信息
-            # 从 https://github.com/linuxdeepin/dde-shell.git 提取 owner/repo
-            upstream_url = self.project.github_url
+            # 从 https://github.com/linuxdeepin/dde-shell.git 或 https://github.com/linuxdeepin/dde-shell 提取 owner/repo
+            upstream_url = self.project.github_url.rstrip('/')  # 先去掉末尾斜杠
             if upstream_url.endswith('.git'):
-                upstream_url = upstream_url[:-4]
+                upstream_url = upstream_url[:-4]  # 去掉.git后缀
             
+            # 提取owner和repo
             parts = upstream_url.replace('https://github.com/', '').split('/')
+            if len(parts) < 2:
+                raise Exception(f"无法解析GitHub URL: {self.project.github_url}")
             upstream_owner = parts[0]
             repo_name = parts[1]
+            logger.info(f"解析GitHub URL: {self.project.github_url} -> {upstream_owner}/{repo_name}")
             
             # 目标分支（通常是master或main）
             base_branch = self.project.github_branch
@@ -1109,14 +1133,17 @@ class BuildExecutor:
                 raise Exception("未找到PR编号，无法监控")
             
             # 解析仓库信息
-            upstream_url = self.project.github_url
+            upstream_url = self.project.github_url.rstrip('/')  # 先去掉末尾斜杠
             if upstream_url.endswith('.git'):
-                upstream_url = upstream_url[:-4]
+                upstream_url = upstream_url[:-4]  # 去掉.git后缀
             
             parts = upstream_url.replace('https://github.com/', '').split('/')
+            if len(parts) < 2:
+                raise Exception(f"无法解析GitHub URL: {self.project.github_url}")
             owner = parts[0]
             repo = parts[1]
             pr_number = self.task.github_pr_number
+            logger.info(f"解析GitHub URL: {self.project.github_url} -> {owner}/{repo}")
             
             # GitHub API URL
             api_url = f"https://api.github.com/repos/{owner}/{repo}/pulls/{pr_number}"
@@ -1198,16 +1225,24 @@ class BuildExecutor:
                             # PR已合并
                             merged_at = pr_data.get('merged_at', '')
                             merged_by = pr_data.get('merged_by', {}).get('login', 'unknown')
+                            merge_commit_sha = pr_data.get('merge_commit_sha', '')
+                            
+                            # 保存PR合并后的commit hash，用于后续Gerrit同步检查
+                            if merge_commit_sha:
+                                self.task.gerrit_commit_hash = merge_commit_sha
+                                db.session.commit()
+                                logger.info(f"保存PR合并后的commit hash: {merge_commit_sha[:8]}")
                             
                             step.log_message = (
                                 f"PR已合并\n"
                                 f"PR编号: #{pr_number}\n"
                                 f"合并者: {merged_by}\n"
                                 f"合并时间: {merged_at}\n"
+                                f"合并Commit: {merge_commit_sha[:8] if merge_commit_sha else 'N/A'}\n"
                                 f"检查次数: {attempt + 1}"
                             )
                             
-                            logger.info(f"PR已合并: task_id={self.task_id}, pr={pr_number}")
+                            logger.info(f"PR已合并: task_id={self.task_id}, pr={pr_number}, merge_commit={merge_commit_sha[:8] if merge_commit_sha else 'N/A'}")
                             return
                         
                         elif state == 'closed' and not merged:
@@ -1272,8 +1307,8 @@ class BuildExecutor:
             step.log_message = "项目未同时配置GitHub和Gerrit，跳过同步等待"
             return
         
-        if not self.task.github_commit_hash:
-            raise Exception("未找到GitHub commit hash，无法监控同步状态")
+        if not self.task.gerrit_commit_hash:
+            raise Exception("未找到commit hash，无法监控同步状态")
         
         try:
             # 获取全局配置
@@ -1284,26 +1319,79 @@ class BuildExecutor:
             if not config or not config.ldap_username or not config.ldap_password:
                 raise Exception("未配置LDAP账号密码，无法访问Gerrit")
             
-            # 提取Gerrit项目名称
-            gerrit_url = self.project.gerrit_url
-            if '/plugins/gitiles/' in gerrit_url:
+            # 提取Gerrit项目名称（优先使用gerrit_repo_url，因为它包含完整路径）
+            gerrit_repo_url = self.project.gerrit_repo_url or self.project.gerrit_url
+            if '/plugins/gitiles/' in gerrit_repo_url:
                 # Gitiles URL格式: https://gerrit.uniontech.com/plugins/gitiles/snipe/dde-appearance
-                gerrit_project_name = gerrit_url.split('/plugins/gitiles/')[-1]
-            elif '/admin/repos/' in gerrit_url:
+                gerrit_project_name = gerrit_repo_url.split('/plugins/gitiles/')[-1]
+            elif '/admin/repos/' in gerrit_repo_url:
                 # Admin repos URL格式: https://gerrit.uniontech.com/admin/repos/dde/dde-appearance
-                gerrit_project_name = gerrit_url.split('/admin/repos/')[-1]
+                gerrit_project_name = gerrit_repo_url.split('/admin/repos/')[-1]
             else:
-                # 直接取最后部分
-                gerrit_project_name = gerrit_url.split('/')[-1]
+                # SSH URL或其他格式: ssh://user@host:port/project 或直接路径
+                # 从SSH URL提取: ssh://ut005580@gerrit.uniontech.com:29418/snipe/dde-tray-loader
+                if gerrit_repo_url.startswith('ssh://'):
+                    gerrit_project_name = gerrit_repo_url.split(':29418/')[-1] if ':29418/' in gerrit_repo_url else gerrit_repo_url.split('/')[-1]
+                else:
+                    gerrit_project_name = gerrit_repo_url.split('/')[-1]
             
             gerrit_branch = self.project.gerrit_branch
             if not gerrit_branch:
                 raise Exception("未配置Gerrit分支")
             
-            # 期望的commit hash（GitHub PR的commit）
-            expected_commit = self.task.github_commit_hash
+            # 期望的commit hash（来自PR合并后的commit）
+            expected_commit = self.task.gerrit_commit_hash
+            
+            # 获取期望commit的message（用于匹配，因为Gerrit可能会重写commit hash）
+            # 注意：这个commit是PR合并后GitHub上的commit，本地仓库可能还没有
+            expected_commit_msg = None
+            try:
+                # 尝试通过GitHub API获取commit message
+                if self.project.github_url and expected_commit:
+                    from app.models import GlobalConfig
+                    config = GlobalConfig.query.first()
+                    if config and config.github_token:
+                        import requests
+                        # 解析GitHub仓库信息
+                        github_url = self.project.github_url
+                        if github_url.endswith('.git'):
+                            github_url = github_url[:-4]
+                        parts = github_url.replace('https://github.com/', '').split('/')
+                        owner = parts[0]
+                        repo = parts[1]
+                        
+                        # 获取commit信息
+                        api_url = f"https://api.github.com/repos/{owner}/{repo}/commits/{expected_commit}"
+                        headers = {
+                            'Authorization': f'token {config.github_token}',
+                            'Accept': 'application/vnd.github.v3+json'
+                        }
+                        response = requests.get(api_url, headers=headers, timeout=10)
+                        if response.status_code == 200:
+                            commit_data = response.json()
+                            expected_commit_msg = commit_data['commit']['message'].strip().split('\n')[0]
+                            logger.info(f"从GitHub API获取到commit message: {expected_commit_msg}")
+            except Exception as e:
+                logger.warning(f"无法从GitHub API获取commit message: {e}")
+            
+            # 如果GitHub API失败，尝试从本地仓库获取（可能获取不到最新的）
+            if not expected_commit_msg and self.project.local_repo_path:
+                try:
+                    repo = Repo(self.project.local_repo_path)
+                    # 先fetch最新的
+                    self._setup_github_proxy(repo)
+                    origin = repo.remotes.origin
+                    origin.fetch()
+                    # 尝试获取commit message
+                    expected_commit_msg = repo.commit(expected_commit).message.strip().split('\n')[0]
+                    logger.info(f"从本地仓库获取到commit message: {expected_commit_msg}")
+                except Exception as e:
+                    logger.warning(f"无法从本地仓库获取commit message: {e}")
+
             
             logger.info(f"开始监控GitHub→Gerrit同步: project={gerrit_project_name}, branch={gerrit_branch}, expected={expected_commit[:8]}")
+            logger.info(f"原始URL: {gerrit_repo_url}")
+            logger.info(f"提取的项目名: '{gerrit_project_name}', 分支名: '{gerrit_branch}'")
             
             # 创建Gerrit服务
             gerrit = create_gerrit_service(
@@ -1316,6 +1404,9 @@ class BuildExecutor:
             max_attempts = 20  # 10分钟 / 30秒
             check_interval = 30  # 30秒
             
+            # 如果是重试，先立即检查一次（不等待）
+            initial_check = (step.retry_count > 0)
+            
             for attempt in range(max_attempts):
                 # 检查是否被停止
                 if self._stop_event.is_set():
@@ -1323,8 +1414,16 @@ class BuildExecutor:
                     logger.info(f"同步监控被停止: task_id={self.task_id}")
                     return
                 
+                # 第一次检查（非重试）或重试时，先立即检查，不等待
+                if attempt > 0 or not initial_check:
+                    # 等待下一次检查（使用可中断的sleep）
+                    for _ in range(check_interval):
+                        if self._stop_event.is_set():
+                            return
+                        time.sleep(1)
+                
                 # 获取Gerrit最新commit
-                logger.info(f"检查Gerrit同步状态 (attempt {attempt + 1}/{max_attempts})")
+                logger.info(f"检查Gerrit同步状态 (attempt {attempt + 1}/{max_attempts}, retry_count={step.retry_count})")
                 
                 result = gerrit.get_latest_commit(gerrit_project_name, gerrit_branch)
                 
@@ -1333,18 +1432,41 @@ class BuildExecutor:
                     
                     logger.info(f"Gerrit最新commit: {gerrit_commit[:8]}, 期望commit: {expected_commit[:8]}")
                     
-                    # 检查是否同步完成
-                    if gerrit_commit == expected_commit:
+                    # 检查是否同步完成（有两种方式）
+                    is_synced = False
+                    
+                    # 方式1：比较commit hash（可能因为Gerrit重写而不同）
+                    if gerrit_commit[:40] == expected_commit[:40]:
+                        is_synced = True
+                        logger.info("通过commit hash匹配确认同步完成")
+                    # 方式2：比较commit message（更可靠）
+                    elif expected_commit_msg:
+                        try:
+                            # 通过Gitiles获取Gerrit上最新commit的message
+                            commit_result = gerrit.get_commit_from_gitiles(gerrit_project_name, gerrit_commit)
+                            if commit_result['success']:
+                                gerrit_commit_msg = commit_result['data']['subject']
+                                logger.info(f"Gerrit commit message: {gerrit_commit_msg}")
+                                
+                                # 比较commit message（去掉空格后比较）
+                                if expected_commit_msg.strip() == gerrit_commit_msg.strip():
+                                    is_synced = True
+                                    logger.info("通过commit message匹配确认同步完成")
+                        except Exception as e:
+                            logger.warning(f"无法获取Gerrit commit message: {e}")
+                    
+                    if is_synced:
                         # 同步完成
                         step.log_message = (
                             f"GitHub→Gerrit同步完成\n"
                             f"Gerrit项目: {gerrit_project_name}\n"
                             f"分支: {gerrit_branch}\n"
-                            f"Commit: {gerrit_commit[:8]}\n"
+                            f"GitHub Commit: {expected_commit[:8]}\n"
+                            f"Gerrit Commit: {gerrit_commit[:8]}\n"
                             f"检查次数: {attempt + 1}"
                         )
                         
-                        logger.info(f"同步完成: task_id={self.task_id}, commit={gerrit_commit[:8]}")
+                        logger.info(f"同步完成: task_id={self.task_id}, gerrit_commit={gerrit_commit[:8]}")
                         return
                     
                     # 尚未同步，继续等待
@@ -1374,12 +1496,6 @@ class BuildExecutor:
                         f"检查次数: {attempt + 1}/{max_attempts}"
                     )
                     db.session.commit()
-                
-                # 等待下一次检查（使用可中断的sleep）
-                for _ in range(check_interval):
-                    if self._stop_event.is_set():
-                        return
-                    time.sleep(1)
             
             # 超时未同步
             raise Exception(f"同步监控超时（{max_attempts * check_interval / 60}分钟），GitHub代码尚未同步到Gerrit")
@@ -1410,55 +1526,110 @@ class BuildExecutor:
             if not token:
                 raise Exception("获取CRP Token失败，请检查LDAP账号密码配置")
             
-            # 确定commit hash
-            if self.task.package_mode == 'crp_only':
-                # 仅CRP模式，使用指定的commit
-                commit_hash = self.task.start_commit_hash
-                logger.info(f"使用指定commit: {commit_hash[:8]}")
-            elif self.project.github_url and self.task.gerrit_commit_hash:
-                # GitHub项目，使用同步后的gerrit commit
-                commit_hash = self.task.gerrit_commit_hash
-                logger.info(f"使用Gerrit同步commit: {commit_hash[:8]}")
-            else:
-                # Gerrit项目或其他情况，使用最新commit
-                repo = Repo(self.project.local_repo_path)
+            # 获取用于CRP打包的commit hash
+            repo = Repo(self.project.local_repo_path)
+            commit_hash = None
+            
+            # 更新本地仓库到最新状态并获取commit hash
+            try:
+                # Fetch最新代码
+                origin = repo.remotes.origin
+                origin.fetch()
+                logger.info(f"已fetch最新代码")
+                
+                # 根据项目类型选择分支
+                if self.project.github_url:
+                    # GitHub仓库：切换到GitHub分支
+                    target_branch = self.project.github_branch
+                    logger.info(f"GitHub仓库，切换到GitHub分支: {target_branch}")
+                else:
+                    # Gerrit仓库：切换到Gerrit分支
+                    target_branch = self.project.gerrit_branch
+                    logger.info(f"Gerrit仓库，切换到Gerrit分支: {target_branch}")
+                
+                if not target_branch:
+                    raise Exception("未配置目标分支")
+                
+                # Checkout到目标分支
+                repo.git.checkout(target_branch)
+                
+                # 重置到远程最新状态
+                remote_branch = f"origin/{target_branch}"
+                logger.info(f"重置到远程分支: {remote_branch}")
+                repo.git.reset('--hard', remote_branch)
+                
+                # 获取最新的commit hash
                 commit_hash = repo.head.commit.hexsha
-                logger.info(f"使用当前commit: {commit_hash[:8]}")
+                logger.info(f"从{target_branch}获取commit: {commit_hash[:8]}")
+                
+            except Exception as e:
+                logger.exception(f"更新本地仓库失败: {e}")
+                raise Exception(f"更新本地仓库失败: {str(e)}")
+
             
             # 确定分支
             branch = self.project.gerrit_branch if self.project.gerrit_branch else self.project.github_branch
             if not branch:
                 raise Exception("未配置项目分支")
             
-            # 格式化架构列表
+            # 格式化架构列表（不做映射，直接使用原值）
             if self.task.architectures:
-                # 转换架构名称映射
-                arch_map = {
-                    'amd64': 'amd64',
-                    'arm64': 'arm64',
-                    'loongarch64': 'loong64',
-                    'riscv64': 'riscv64'
-                }
-                arches = ';'.join([arch_map.get(arch, arch) for arch in self.task.architectures])
+                arches = ';'.join(self.task.architectures)
             else:
                 # 默认架构
-                arches = 'amd64;arm64;loong64'
+                arches = 'amd64;arm64;loong64;sw64;mips64el'
+            
+            # 准备changelog - 只使用第一行作为标题
+            changelog_text = ""
+            if hasattr(self.task, 'changelog') and self.task.changelog:
+                changelog_text = self.task.changelog
+            else:
+                # 尝试从最后一个commit获取message
+                try:
+                    git_log = subprocess.run(
+                        ['git', 'log', '-1', '--pretty=format:%s', commit_hash],  # %s只获取标题
+                        cwd=self.project.local_repo_path,
+                        capture_output=True,
+                        text=True,
+                        timeout=10
+                    )
+                    if git_log.returncode == 0 and git_log.stdout.strip():
+                        changelog_text = git_log.stdout.strip()
+                    else:
+                        changelog_text = f"Release {self.task.version}"
+                except Exception:
+                    changelog_text = f"Release {self.task.version}"
+            
+            # 只取第一行作为标题
+            changelog_text = changelog_text.split('\n')[0].strip()
+            
+            # 限制长度为100字符
+            if len(changelog_text) > 100:
+                changelog_text = changelog_text[:100]
+                logger.info(f"Changelog标题已截断到100字符")
+            
+            logger.info(f"使用Changelog标题: {changelog_text}")
+            
             
             logger.info(f"提交CRP打包: project={self.project.name}, topic_id={self.task.crp_topic_id}, "
-                       f"branch={branch}, commit={commit_hash[:8]}, arches={arches}")
+                       f"branch={branch}, commit={commit_hash} (短hash: {commit_hash}), arches={arches}")
             
-            # 调用CRP API提交打包任务
+            # 获取CRP项目名（优先使用配置的名称，否则使用项目名-v25）
+            crp_project_name = self.project.crp_project_name if hasattr(self.project, 'crp_project_name') and self.project.crp_project_name else f"{self.project.name}-v25"
+            logger.info(f"使用CRP项目名: {crp_project_name}")
+            
+            # 调用CRP API提交打包任务（project_id=0让CRPService自动解析）
             result = CRPService.submit_build(
                 token=token,
                 topic_id=int(self.task.crp_topic_id),
-                project_id=0,  # 项目ID可以为0，CRP会自动匹配
-                project_name=self.project.name,
+                project_id=0,
+                project_name=crp_project_name,
                 branch=branch,
                 commit=commit_hash,
                 tag=self.task.version,
                 arches=arches,
                 branch_id=config.crp_branch_id,
-                changelog=f"Release {self.task.version}"
+                changelog=changelog_text
             )
             
             if not result or not result.get('success'):
