@@ -5,3 +5,7 @@ gerrit-api.php
 GERRIT_API_USAGE.md
 pre
 package-crp.py
+BUILD_TASK_README.md
+提交逻辑
+架构说明
+.env
