@@ -807,7 +807,14 @@ function renderProjects(projects) {
                             <i class="bi bi-arrow-clockwise"></i>
                         </button>
                         <button class="btn btn-sm btn-package-table" 
-                                onclick='openPackageModal(${project.id}, "${project.name}", "${currentVersion}", "${project.github_branch}", "${project.gerrit_branch}", "${latestCommit ? latestCommit.hash : ''}", "${latestCommit ? latestCommit.message.replace(/"/g, '&quot;') : ''}")'
+                                data-project-id="${project.id}"
+                                data-project-name="${project.name}"
+                                data-current-version="${currentVersion}"
+                                data-github-branch="${project.github_branch}"
+                                data-gerrit-branch="${project.gerrit_branch}"
+                                data-commit-hash="${latestCommit ? latestCommit.hash : ''}"
+                                data-commit-message="${latestCommit ? latestCommit.message : ''}"
+                                onclick="openPackageModalFromButton(this)"
                                 title="打包">
                             <i class="bi bi-box-seam"></i>
                         </button>
@@ -859,6 +866,19 @@ function renderProjects(projects) {
 
 // 打开打包配置模态框
 let currentProjectData = {};
+
+// 从按钮的 data 属性安全地获取数据
+function openPackageModalFromButton(button) {
+    const projectId = parseInt(button.getAttribute('data-project-id'));
+    const projectName = button.getAttribute('data-project-name');
+    const currentVersion = button.getAttribute('data-current-version');
+    const githubBranch = button.getAttribute('data-github-branch');
+    const gerritBranch = button.getAttribute('data-gerrit-branch');
+    const commitHash = button.getAttribute('data-commit-hash');
+    const commitMessage = button.getAttribute('data-commit-message');
+    
+    openPackageModal(projectId, projectName, currentVersion, githubBranch, gerritBranch, commitHash, commitMessage);
+}
 
 function openPackageModal(projectId, projectName, currentVersion, githubBranch, gerritBranch, commitHash, commitMessage) {
     currentProjectData = {
