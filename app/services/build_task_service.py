@@ -1748,7 +1748,7 @@ class TaskQueue:
             return
         
         self.queue = queue.Queue()
-        self.executor = ThreadPoolExecutor(max_workers=3)  # 最多3个并发任务
+        self.executor = ThreadPoolExecutor(max_workers=12)  # 最多12个并发任务
         self.running_tasks = {}  # task_id -> (Future, BuildExecutor)
         
         # 保存Flask应用实例用于在线程中创建上下文
