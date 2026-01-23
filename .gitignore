@@ -1,0 +1,7 @@
+# Python
+__pycache__/
+*.py[cod]
+gerrit-api.php
+GERRIT_API_USAGE.md
+pre
+package-crp.py
