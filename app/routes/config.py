@@ -4,6 +4,22 @@ from app.models import GlobalConfig
 
 config_bp = Blueprint('config', __name__, url_prefix='/config')
 
+@config_bp.route('/api/config', methods=['GET'])
+def get_config_api():
+    """获取配置信息的API端点"""
+    config = GlobalConfig.get_config()
+    return jsonify({
+        'success': True,
+        'data': {
+            'crp_branch_id': config.crp_branch_id,
+            'crp_topic_type': config.crp_topic_type,
+            'ldap_username': config.ldap_username,
+            'github_username': config.github_username,
+            'maintainer_name': config.maintainer_name,
+            'maintainer_email': config.maintainer_email
+        }
+    })
+
 @config_bp.route('/', methods=['GET', 'POST'])
 def global_config():
     """全局配置页面"""

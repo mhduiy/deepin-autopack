@@ -230,6 +230,132 @@
             box-shadow: 0 2px 8px rgba(0,0,0,0.08);
         }
         
+        /* Toast 通知样式 */
+        #toastContainer {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 9999;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            max-width: 400px;
+        }
+
+        .toast-notification {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+            padding: 16px 20px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            animation: slideInRight 0.3s ease-out, fadeOut 0.3s ease-in 4.7s;
+            opacity: 1;
+            transform: translateX(0);
+            border-left: 4px solid;
+        }
+
+        .toast-notification.success {
+            border-left-color: #10b981;
+        }
+
+        .toast-notification.error {
+            border-left-color: #ef4444;
+        }
+
+        .toast-notification.info {
+            border-left-color: #3b82f6;
+        }
+
+        .toast-notification.warning {
+            border-left-color: #f59e0b;
+        }
+
+        .toast-icon {
+            flex-shrink: 0;
+            width: 24px;
+            height: 24px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 50%;
+            font-size: 14px;
+        }
+
+        .toast-notification.success .toast-icon {
+            background: #d1fae5;
+            color: #10b981;
+        }
+
+        .toast-notification.error .toast-icon {
+            background: #fee2e2;
+            color: #ef4444;
+        }
+
+        .toast-notification.info .toast-icon {
+            background: #dbeafe;
+            color: #3b82f6;
+        }
+
+        .toast-notification.warning .toast-icon {
+            background: #fef3c7;
+            color: #f59e0b;
+        }
+
+        .toast-content {
+            flex: 1;
+        }
+
+        .toast-title {
+            font-weight: 600;
+            font-size: 0.95rem;
+            color: #1f2937;
+            margin-bottom: 4px;
+        }
+
+        .toast-message {
+            font-size: 0.875rem;
+            color: #6b7280;
+            line-height: 1.4;
+        }
+
+        .toast-close {
+            flex-shrink: 0;
+            background: transparent;
+            border: none;
+            color: #9ca3af;
+            cursor: pointer;
+            padding: 4px;
+            line-height: 1;
+            font-size: 18px;
+            transition: color 0.2s;
+        }
+
+        .toast-close:hover {
+            color: #4b5563;
+        }
+
+        @keyframes slideInRight {
+            from {
+                transform: translateX(400px);
+                opacity: 0;
+            }
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+
+        @keyframes fadeOut {
+            from {
+                opacity: 1;
+            }
+            to {
+                opacity: 0;
+            }
+        }
+        
         /* 响应式 */
         @media (max-width: 768px) {
             .sidebar {
@@ -255,10 +381,19 @@
             .sidebar-toggle {
                 display: none;
             }
+            
+            #toastContainer {
+                left: 20px;
+                right: 20px;
+                max-width: none;
+            }
         }
     </style>
 </head>
 <body>
+    <!-- Toast 通知容器 -->
+    <div id="toastContainer"></div>
+    
     <!-- 侧边栏 -->
     <div class="sidebar" id="sidebar">
         <!-- Logo -->
@@ -347,6 +482,50 @@
     <script src="{{ url_for('static', filename='js/main.js') }}"></script>
     
     <script>
+        // Toast 通知函数
+        window.showToast = function(message, type = 'info', title = '') {
+            const container = document.getElementById('toastContainer');
+            const toast = document.createElement('div');
+            toast.className = `toast-notification ${type}`;
+            
+            const icons = {
+                success: 'bi-check-circle-fill',
+                error: 'bi-x-circle-fill',
+                info: 'bi-info-circle-fill',
+                warning: 'bi-exclamation-triangle-fill'
+            };
+            
+            const titles = {
+                success: title || '成功',
+                error: title || '错误',
+                info: title || '提示',
+                warning: title || '警告'
+            };
+            
+            toast.innerHTML = `
+                <div class="toast-icon">
+                    <i class="bi ${icons[type]}"></i>
+                </div>
+                <div class="toast-content">
+                    <div class="toast-title">${titles[type]}</div>
+                    <div class="toast-message">${message}</div>
+                </div>
+                <button class="toast-close" onclick="this.parentElement.remove()">
+                    <i class="bi bi-x"></i>
+                </button>
+            `;
+            
+            container.appendChild(toast);
+            
+            // 5秒后自动移除
+            setTimeout(() => {
+                if (toast.parentElement) {
+                    toast.style.animation = 'fadeOut 0.3s ease-out';
+                    setTimeout(() => toast.remove(), 300);
+                }
+            }, 5000);
+        };
+        
         // 侧边栏折叠功能
         function toggleSidebar() {
             const sidebar = document.getElementById('sidebar');

@@ -4,6 +4,7 @@
 
 from flask import Blueprint, render_template, jsonify, request
 from app.services.build_task_service import BuildTaskService
+from app.models.build_task import BuildTask
 import logging
 
 logger = logging.getLogger(__name__)
@@ -274,3 +275,52 @@ def api_retry_task(task_id):
             'message': f'重试任务失败: {str(e)}'
         }), 500
 
+
+@build_bp.route('/api/tasks/<int:task_id>', methods=['DELETE'])
+def api_delete_task(task_id):
+    """删除任务"""
+    try:
+        # 直接查询任务对象
+        task = BuildTask.query.get(task_id)
+        if not task:
+            return jsonify({
+                'success': False,
+                'message': '任务不存在'
+            }), 404
+        
+        # 检查任务状态，运行中的任务不允许删除
+        if task.status == 'running':
+            return jsonify({
+                'success': False,
+                'message': '运行中的任务不能删除'
+            }), 400
+        
+        BuildTaskService.delete_task(task_id)
+        return jsonify({
+            'success': True,
+            'message': '任务已删除'
+        })
+    except Exception as e:
+        logger.exception(f"删除任务失败: {e}")
+        return jsonify({
+            'success': False,
+            'message': f'删除任务失败: {str(e)}'
+        }), 500
+
+
+@build_bp.route('/api/tasks/cleanup-completed', methods=['POST'])
+def api_cleanup_completed_tasks():
+    """清理所有已完成的任务"""
+    try:
+        deleted_count = BuildTaskService.cleanup_completed_tasks()
+        return jsonify({
+            'success': True,
+            'message': f'已清理 {deleted_count} 个已完成的任务',
+            'deleted_count': deleted_count
+        })
+    except Exception as e:
+        logger.exception(f"清理任务失败: {e}")
+        return jsonify({
+            'success': False,
+            'message': f'清理任务失败: {str(e)}'
+        }), 500

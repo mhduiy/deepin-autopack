@@ -26,6 +26,10 @@
                 </button>
             </div>
             
+            <button class="btn btn-outline-danger" onclick="cleanupCompletedTasks()">
+                <i class="bi bi-trash"></i> 清理已完成
+            </button>
+            
             <button class="btn btn-outline-primary" onclick="refreshTasks()">
                 <i class="bi bi-arrow-clockwise"></i> 刷新
             </button>
@@ -851,6 +855,21 @@ function createActionButtons(task) {
         `);
     }
     
+    // 删除按钮 - 运行中的任务不可删除
+    if (task.status === 'running') {
+        buttons.push(`
+            <button class="btn btn-sm btn-outline-danger" disabled title="运行中的任务不能删除">
+                <i class="bi bi-trash"></i> 删除
+            </button>
+        `);
+    } else {
+        buttons.push(`
+            <button class="btn btn-sm btn-outline-danger" onclick="deleteTask(${task.id})">
+                <i class="bi bi-trash"></i> 删除
+            </button>
+        `);
+    }
+    
     return buttons.join('');
 }
 
@@ -1032,5 +1051,76 @@ async function cancelTask(taskId) {
         });
     }
 }
+
+// 删除任务
+async function deleteTask(taskId) {
+    const confirmed = await customConfirm(
+        `任务及其所有步骤记录将被永久删除，此操作不可恢复。`,
+        `删除任务 #${taskId}`,
+        'trash',
+        'danger'
+    );
+    
+    if (confirmed) {
+        fetch(`/api/tasks/${taskId}`, {
+            method: 'DELETE',
+            headers: {
+                'Content-Type': 'application/json',
+            }
+        })
+        .then(response => {
+            if (!response.ok) {
+                return response.json().then(err => {
+                    throw new Error(err.error || '删除失败');
+                });
+            }
+            return response.json();
+        })
+        .then(data => {
+            showToast('任务已成功删除', 'success');
+            loadTasks();
+        })
+        .catch(error => {
+            console.error('删除任务失败:', error);
+            showToast(`删除任务失败：${error.message}`, 'error');
+        });
+    }
+}
+
+// 批量清理已完成的任务
+async function cleanupCompletedTasks() {
+    const confirmed = await customConfirm(
+        `将删除所有已完成（成功、失败、取消）的任务，此操作不可恢复。`,
+        `清理已完成任务`,
+        'trash',
+        'danger'
+    );
+    
+    if (confirmed) {
+        fetch('/api/tasks/cleanup-completed', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            }
+        })
+        .then(response => {
+            if (!response.ok) {
+                return response.json().then(err => {
+                    throw new Error(err.error || '清理失败');
+                });
+            }
+            return response.json();
+        })
+        .then(data => {
+            showToast(`已清理 ${data.deleted_count} 个已完成的任务`, 'success');
+            loadTasks();
+        })
+        .catch(error => {
+            console.error('清理任务失败:', error);
+            showToast(`清理任务失败：${error.message}`, 'error');
+        });
+    }
+}
+
 </script>
 {% endblock %}

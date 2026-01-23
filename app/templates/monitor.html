@@ -457,6 +457,16 @@
     align-items: start;
 }
 
+.commit-hash-link {
+    text-decoration: none;
+    display: inline-block;
+    transition: transform 0.2s ease;
+}
+
+.commit-hash-link:hover {
+    transform: translateY(-2px);
+}
+
 .commit-hash-compact {
     background: #2c3e50;
     color: white;
@@ -465,6 +475,11 @@
     font-family: 'Courier New', monospace;
     font-size: 0.75rem;
     white-space: nowrap;
+    transition: background 0.2s ease;
+}
+
+.commit-hash-link:hover .commit-hash-compact {
+    background: #667eea;
 }
 
 .commit-message-compact {
@@ -479,12 +494,28 @@
     gap: 1.5rem;
     font-size: 0.875rem;
     color: #6c757d;
+    align-items: center;
 }
 
 .commit-meta-compact span {
     display: flex;
     align-items: center;
     gap: 0.25rem;
+}
+
+.commit-view-link {
+    color: #667eea;
+    text-decoration: none;
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    transition: color 0.2s ease;
+}
+
+.commit-view-link:hover {
+    color: #764ba2;
+    text-decoration: underline;
 }
 
 .spinner-border-sm {
@@ -690,7 +721,8 @@ document.addEventListener('DOMContentLoaded', function() {
 // 加载监控数据
 async function loadMonitorData() {
     try {
-        const response = await fetch('/api/monitor/data');
+        // 使用并行版本的API，性能更好
+        const response = await fetch('/api/monitor/data-parallel');
         const result = await response.json();
         
         if (result.success && result.data) {
@@ -738,7 +770,6 @@ function renderProjects(projects) {
                     <tr>
                         <th><i class="bi bi-folder2-open"></i> 项目名</th>
                         <th><i class="bi bi-tag-fill"></i> 当前版本</th>
-                        <th><i class="bi bi-bookmark-fill"></i> 最新Tag</th>
                         <th class="text-center"><i class="bi bi-plus-circle-fill"></i> 新增提交</th>
                         <th><i class="bi bi-hash"></i> 最新Commit</th>
                         <th class="text-center"><i class="bi bi-gear"></i> 操作</th>
@@ -750,7 +781,6 @@ function renderProjects(projects) {
     projects.forEach(projectInfo => {
         const project = projectInfo.project;
         const currentVersion = projectInfo.current_version || '';
-        const latestTag = projectInfo.latest_tag || '';
         const newCommitsCount = projectInfo.new_commits_count || 0;
         const newCommits = projectInfo.new_commits || [];
         const latestCommit = projectInfo.latest_commit;
@@ -767,11 +797,6 @@ function renderProjects(projects) {
                         ${currentVersion || '<span class="text-muted">未知</span>'}
                     </span>
                 </td>
-                <td>
-                    <span class="tag-badge" id="tag-${project.id}">
-                        ${latestTag ? '<i class="bi bi-tag me-1"></i>' + latestTag : '<span class="text-muted">无Tag</span>'}
-                    </span>
-                </td>
                 <td class="text-center">
                     <div class="commit-count-cell">
                         <span id="commit-count-${project.id}">
@@ -784,8 +809,8 @@ function renderProjects(projects) {
                                 type="button" 
                                 data-bs-toggle="collapse" 
                                 data-bs-target="#commits-${project.id}"
-                                title="查看提交列表">
-                            <i class="bi bi-list-ul"></i>
+                                title="展开查看提交列表">
+                            展开
                         </button>
                         ` : ''}
                     </div>
@@ -824,22 +849,32 @@ function renderProjects(projects) {
         `;
         
         if (newCommits.length > 0) {
+            // 构建 GitHub 提交链接
+            const githubUrl = project.github_url || '';
+            const githubBaseUrl = githubUrl.replace(/\.git$/, '');
+            
             tableHTML += `
                 <tr class="collapse-row">
-                    <td colspan="6" class="p-0">
+                    <td colspan="5" class="p-0">
                         <div class="collapse" id="commits-${project.id}">
                             <div class="commits-collapse-content">
                                 <div class="commits-list-compact">
             `;
             
             newCommits.forEach(commit => {
+                const commitUrl = `${githubBaseUrl}/commit/${commit.full_hash}`;
                 tableHTML += `
                     <div class="commit-item-compact">
-                        <code class="commit-hash-compact">${commit.hash}</code>
+                        <a href="${commitUrl}" target="_blank" class="commit-hash-link" title="在 GitHub 上查看">
+                            <code class="commit-hash-compact">${commit.hash}</code>
+                        </a>
                         <span class="commit-message-compact">${commit.message}</span>
                         <div class="commit-meta-compact">
                             <span><i class="bi bi-person"></i> ${commit.author}</span>
                             <span><i class="bi bi-clock"></i> ${commit.date}</span>
+                            <a href="${commitUrl}" target="_blank" class="commit-view-link">
+                                <i class="bi bi-box-arrow-up-right"></i> 查看详情
+                            </a>
                         </div>
                     </div>
                 `;
@@ -931,6 +966,12 @@ async function loadCRPTopics() {
                 option.dataset.topicName = topic.Name;
                 select.appendChild(option);
             });
+            
+            // 默认选中最后一个主题
+            if (result.data.length > 0) {
+                const lastTopic = result.data[result.data.length - 1];
+                select.value = lastTopic.ID;
+            }
         } else {
             select.innerHTML = '<option value="">暂无可用主题</option>';
         }
@@ -1032,7 +1073,7 @@ function submitPackageTask() {
     const newVersion = document.getElementById('newVersion').value.trim();
     
     if (packageMode !== 'crp_only' && !newVersion) {
-        alert('请输入新版本号');
+        showToast('请输入新版本号', 'warning');
         return;
     }
     
@@ -1043,7 +1084,7 @@ function submitPackageTask() {
         });
         
         if (architectures.length === 0 && packageMode !== 'changelog_only') {
-            alert('请至少选择一个目标架构');
+            showToast('请至少选择一个目标架构', 'warning');
             return;
         }
     }
@@ -1057,7 +1098,7 @@ function submitPackageTask() {
         crpTopicName = selectedOption ? selectedOption.dataset.topicName || selectedOption.textContent : '';
         
         if (!crpTopicId) {
-            alert('请选择CRP主题');
+            showToast('请选择CRP主题', 'warning');
             return;
         }
     }
@@ -1098,7 +1139,7 @@ function submitPackageTask() {
     .then(response => response.json())
     .then(data => {
         if (data.success) {
-            alert('打包任务已成功创建并启动！\n\n可以在打包任务页面查看执行进度。');
+            showToast('可以在打包任务页面查看执行进度', 'success', '打包任务已成功创建并启动');
             const modal = bootstrap.Modal.getInstance(document.getElementById('packageModal'));
             modal.hide();
         } else {
@@ -1106,7 +1147,7 @@ function submitPackageTask() {
         }
     })
     .catch(error => {
-        alert('提交失败：' + error.message);
+        showToast(error.message, 'error', '提交失败');
         console.error('提交打包任务失败:', error);
     })
     .finally(() => {
@@ -1133,10 +1174,6 @@ async function refreshProject(projectId) {
             if (result.data.current_version) {
                 document.getElementById(`version-${projectId}`).innerHTML = result.data.current_version;
             }
-            if (result.data.latest_tag) {
-                document.getElementById(`tag-${projectId}`).innerHTML = 
-                    `<i class="bi bi-tag me-1"></i>${result.data.latest_tag}`;
-            }
             if (result.data.new_commits_count !== undefined) {
                 const countEl = document.getElementById(`commit-count-${projectId}`);
                 if (result.data.new_commits_count > 0) {
@@ -1154,11 +1191,11 @@ async function refreshProject(projectId) {
             
             setTimeout(() => location.reload(), 500);
         } else {
-            alert('刷新失败: ' + result.message);
+            showToast(result.message, 'error', '刷新失败');
         }
     } catch (error) {
         console.error('刷新失败:', error);
-        alert('刷新失败: ' + error.message);
+        showToast(error.message, 'error', '刷新失败');
     } finally {
         btn.disabled = false;
         btn.innerHTML = originalHtml;
@@ -1184,14 +1221,14 @@ async function refreshAllProjects() {
         const result = await response.json();
         
         if (result.success) {
-            alert(`刷新完成！成功: ${result.data.success_count}, 失败: ${result.data.failed_count}`);
+            showToast(`成功: ${result.data.success_count}, 失败: ${result.data.failed_count}`, 'success', '刷新完成');
             location.reload();
         } else {
-            alert('刷新失败: ' + result.message);
+            showToast(result.message, 'error', '刷新失败');
         }
     } catch (error) {
         console.error('刷新失败:', error);
-        alert('刷新失败: ' + error.message);
+        showToast(error.message, 'error', '刷新失败');
     } finally {
         btn.disabled = false;
         btn.innerHTML = originalHtml;

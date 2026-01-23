@@ -4,6 +4,7 @@
 """
 
 import os
+import subprocess
 import threading
 from git import Repo, GitCommandError
 from app import db
@@ -203,7 +204,7 @@ class RepoService:
     @staticmethod
     def get_latest_tag(project: Project) -> Optional[str]:
         """
-        获取仓库最新的 tag
+        获取仓库最新的 tag（优化版本，使用 git 命令）
         
         Args:
             project: 项目对象
@@ -215,10 +216,34 @@ class RepoService:
             return None
         
         try:
-            repo = Repo(project.local_repo_path)
-            tags = sorted(repo.tags, key=lambda t: t.commit.committed_datetime, reverse=True)
-            if tags:
-                return str(tags[0])
+            # 使用 git 命令直接获取最新 tag，比 GitPython 的 sorted 快很多
+            result = subprocess.run(
+                ['git', 'describe', '--tags', '--abbrev=0'],
+                cwd=project.local_repo_path,
+                capture_output=True,
+                text=True,
+                timeout=5
+            )
+            
+            if result.returncode == 0 and result.stdout.strip():
+                return result.stdout.strip()
+            
+            # 如果上面的命令失败（例如没有 tag），尝试获取所有 tag 中最新的一个
+            result = subprocess.run(
+                ['git', 'tag', '--sort=-creatordate'],
+                cwd=project.local_repo_path,
+                capture_output=True,
+                text=True,
+                timeout=5
+            )
+            
+            if result.returncode == 0 and result.stdout.strip():
+                tags = result.stdout.strip().split('\n')
+                return tags[0] if tags else None
+            
+            return None
+        except subprocess.TimeoutExpired:
+            logger.error(f"获取最新 tag 超时: {project.name}")
             return None
         except Exception as e:
             logger.error(f"获取最新 tag 失败: {str(e)}")

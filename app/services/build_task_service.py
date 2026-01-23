@@ -281,6 +281,57 @@ class BuildTaskService:
         
         tasks = query.all()
         return [task.to_dict() for task in tasks]
+    
+    @staticmethod
+    def delete_task(task_id):
+        """删除任务"""
+        from app import db
+        
+        task = BuildTask.query.get(task_id)
+        if not task:
+            raise ValueError(f"任务不存在: {task_id}")
+        
+        # 运行中的任务不允许删除
+        if task.status == 'running':
+            raise ValueError("运行中的任务不能删除")
+        
+        # 删除任务相关的步骤记录
+        BuildTaskStep.query.filter_by(task_id=task_id).delete()
+        
+        # 删除任务
+        db.session.delete(task)
+        db.session.commit()
+        
+        logger.info(f"任务已删除: {task_id}")
+    
+    @staticmethod
+    def cleanup_completed_tasks():
+        """清理所有已完成的任务（成功和失败的）"""
+        from app import db
+        
+        # 查找所有已完成的任务
+        completed_tasks = BuildTask.query.filter(
+            BuildTask.status.in_(['success', 'failed', 'cancelled'])
+        ).all()
+        
+        deleted_count = 0
+        for task in completed_tasks:
+            try:
+                # 删除任务相关的步骤记录
+                BuildTaskStep.query.filter_by(task_id=task.id).delete()
+                
+                # 删除任务
+                db.session.delete(task)
+                deleted_count += 1
+            except Exception as e:
+                logger.error(f"删除任务 {task.id} 失败: {e}")
+                db.session.rollback()
+                continue
+        
+        db.session.commit()
+        logger.info(f"已清理 {deleted_count} 个已完成的任务")
+        
+        return deleted_count
 
 
 class BuildExecutor:
