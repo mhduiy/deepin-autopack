@@ -57,8 +57,8 @@
                                    class="form-control" 
                                    id="gerrit_branch" 
                                    name="gerrit_branch" 
-                                   value="{{ project.gerrit_branch if project else '' }}"
-                                   placeholder="master">
+                                   value="{{ project.gerrit_branch if project else 'upstream/master' }}"
+                                   placeholder="upstream/master">
                         </div>
                     </div>
                     
@@ -96,8 +96,8 @@
                                    class="form-control" 
                                    id="github_branch" 
                                    name="github_branch" 
-                                   value="{{ project.github_branch if project else '' }}"
-                                   placeholder="main">
+                                   value="{{ project.github_branch if project else 'master' }}"
+                                   placeholder="master">
                         </div>
                     </div>
 
@@ -108,27 +108,21 @@
                         </h5>
                     </div>
 
-                    <div class="mb-4">
-                        <label for="last_commit_hash" class="form-label">上一次打包 Commit Hash</label>
-                        <input type="text" 
-                               class="form-control font-monospace" 
-                               id="last_commit_hash" 
-                               name="last_commit_hash" 
-                               value="{{ project.last_commit_hash if project else '' }}"
-                               placeholder="例如：a1b2c3d4e5f6g7h8i9j0"
-                               maxlength="40">
-                        <div class="form-text">用于追踪自上次打包以来的新提交</div>
-                    </div>
+                    <!-- 隐藏的上一次打包 Commit Hash 字段（保持兼容性） -->
+                    <input type="hidden" 
+                           id="last_commit_hash" 
+                           name="last_commit_hash" 
+                           value="{{ project.last_commit_hash if project else '0000000000000000000000000000000000000000' }}">
 
                     <div class="mb-4">
-                        <label for="crp_project_name" class="form-label">CRP 项目名称（可选）</label>
+                        <label for="crp_project_name" class="form-label">CRP 项目名称</label>
                         <input type="text" 
                                class="form-control" 
                                id="crp_project_name" 
                                name="crp_project_name" 
                                value="{{ project.crp_project_name if project else '' }}"
-                               placeholder="留空则自动使用：项目名-v25">
-                        <div class="form-text">CRP 平台上的项目名称。如果为空，将默认使用 <code>项目名-v25</code> 格式（如：dtk6log-v25）</div>
+                               placeholder="例如：deepin-music-v25">
+                        <div class="form-text">CRP 平台上的项目名称。默认为 <code>项目名-v25</code> 格式</div>
                     </div>
 
                     <!-- 按钮组 -->
@@ -146,4 +140,35 @@
         </div>
     </div>
 </div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const nameInput = document.getElementById('name');
+    const crpProjectNameInput = document.getElementById('crp_project_name');
+    const isEditMode = {{ 'true' if project else 'false' }};
+    
+    // 只在新建模式下启用自动填充
+    if (!isEditMode) {
+        nameInput.addEventListener('input', function() {
+            const projectName = this.value.trim();
+            if (projectName) {
+                // 只有当CRP项目名称为空时才自动填充
+                if (!crpProjectNameInput.value || crpProjectNameInput.value === crpProjectNameInput.dataset.autoFilled) {
+                    const autoFilledValue = projectName + '-v25';
+                    crpProjectNameInput.value = autoFilledValue;
+                    crpProjectNameInput.dataset.autoFilled = autoFilledValue;
+                }
+            }
+        });
+        
+        // 监听CRP项目名称的手动修改
+        crpProjectNameInput.addEventListener('input', function() {
+            // 如果用户手动修改了，清除自动填充标记
+            if (this.value !== this.dataset.autoFilled) {
+                delete this.dataset.autoFilled;
+            }
+        });
+    }
+});
+</script>
 {% endblock %}

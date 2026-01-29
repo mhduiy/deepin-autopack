@@ -2,6 +2,10 @@
 
 {% block title %}提交监控 - Deepin 自动打包工具{% endblock %}
 
+{% block extra_css %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/progress.css') }}">
+{% endblock %}
+
 {% block content %}
 <!-- 主内容区域 -->
 <div id="mainContent">
@@ -9,9 +13,46 @@
         <h2 class="mb-0">
             <i class="bi bi-activity text-primary me-2"></i>提交监控
         </h2>
-        <button class="btn btn-primary" onclick="refreshAllProjects()">
-            <i class="bi bi-arrow-clockwise me-1"></i>刷新所有项目
-        </button>
+        <div class="btn-group" role="group">
+            <button class="btn btn-primary" onclick="refreshAllProjects()" id="refreshAllBtn">
+                <i class="bi bi-arrow-clockwise me-1"></i>刷新所有项目
+            </button>
+            <button class="btn btn-success" onclick="exportProjectsWithNewCommits()" id="exportBtn">
+                <i class="bi bi-download me-1"></i>导出有新增提交的项目
+            </button>
+            <button class="btn btn-warning" onclick="batchPackProjects()" id="batchPackBtn" disabled>
+                <i class="bi bi-box-seam me-1"></i>打包有新增提交的项目
+            </button>
+        </div>
+    </div>
+
+    <!-- 刷新进度条 -->
+    <div id="refreshProgressContainer" class="mb-4" style="display: none;">
+        <div class="card border-primary">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <h6 class="mb-0">
+                        <i class="bi bi-hourglass-split text-primary me-2"></i>
+                        <span id="progressTitle">正在刷新项目</span>
+                    </h6>
+                    <span class="badge bg-primary" id="progressBadge">0/0</span>
+                </div>
+                <div class="progress" style="height: 25px;">
+                    <div class="progress-bar progress-bar-striped progress-bar-animated" 
+                         id="progressBar"
+                         role="progressbar" 
+                         style="width: 0%" 
+                         aria-valuenow="0" 
+                         aria-valuemin="0" 
+                         aria-valuemax="100">
+                        <span id="progressText">0%</span>
+                    </div>
+                </div>
+                <div class="mt-2 small text-muted" id="progressDetail">
+                    等待开始...
+                </div>
+            </div>
+        </div>
     </div>
 
     <div id="projectsContainer">
@@ -1203,36 +1244,170 @@ async function refreshProject(projectId) {
 }
 
 // 刷新所有项目
-async function refreshAllProjects() {
+function refreshAllProjects() {
     if (!confirm('确定要刷新所有项目吗？这可能需要一些时间。')) {
         return;
     }
     
-    const btn = event.target;
+    const btn = document.getElementById('refreshAllBtn');
     const originalHtml = btn.innerHTML;
     btn.disabled = true;
     btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>刷新中...';
     
-    try {
-        const response = await fetch('/monitor/refresh-all', {
-            method: 'POST'
-        });
-        
-        const result = await response.json();
-        
-        if (result.success) {
-            showToast(`成功: ${result.data.success_count}, 失败: ${result.data.failed_count}`, 'success', '刷新完成');
-            location.reload();
-        } else {
-            showToast(result.message, 'error', '刷新失败');
+    // 显示进度条容器
+    const progressContainer = document.getElementById('refreshProgressContainer');
+    const progressBar = document.getElementById('progressBar');
+    const progressText = document.getElementById('progressText');
+    const progressBadge = document.getElementById('progressBadge');
+    const progressDetail = document.getElementById('progressDetail');
+    const progressTitle = document.getElementById('progressTitle');
+    
+    progressContainer.style.display = 'block';
+    progressBar.style.width = '0%';
+    progressBar.setAttribute('aria-valuenow', '0');
+    progressText.textContent = '0%';
+    progressBadge.textContent = '0/0';
+    progressDetail.textContent = '正在初始化...';
+    progressTitle.textContent = '正在刷新项目';
+    
+    // 使用 EventSource 接收服务器发送的事件
+    const eventSource = new EventSource('/monitor/refresh-all');
+    let successCount = 0;
+    let failedCount = 0;
+    
+    eventSource.onmessage = function(event) {
+        try {
+            const data = JSON.parse(event.data);
+            
+            switch(data.type) {
+                case 'start':
+                    progressBadge.textContent = `0/${data.total}`;
+                    progressDetail.textContent = `共 ${data.total} 个项目需要刷新`;
+                    break;
+                    
+                case 'progress':
+                    const percent = Math.round((data.current / data.total) * 100);
+                    progressBar.style.width = `${percent}%`;
+                    progressBar.setAttribute('aria-valuenow', percent);
+                    progressText.textContent = `${percent}%`;
+                    progressBadge.textContent = `${data.current}/${data.total}`;
+                    progressDetail.innerHTML = `<i class="bi bi-gear-fill spinning me-1"></i>正在处理: <strong>${data.project_name}</strong>`;
+                    break;
+                    
+                case 'project_complete':
+                    if (data.status === 'success') {
+                        successCount++;
+                        progressDetail.innerHTML = `<i class="bi bi-check-circle-fill text-success me-1"></i>已完成: <strong>${data.project_name}</strong>`;
+                    } else {
+                        failedCount++;
+                        const errorMsg = data.error ? ` (${data.error})` : '';
+                        progressDetail.innerHTML = `<i class="bi bi-x-circle-fill text-danger me-1"></i>失败: <strong>${data.project_name}</strong>${errorMsg}`;
+                    }
+                    break;
+                    
+                case 'complete':
+                    progressBar.classList.remove('progress-bar-animated');
+                    progressBar.classList.add('bg-success');
+                    progressBar.style.width = '100%';
+                    progressText.textContent = '100%';
+                    progressTitle.innerHTML = '<i class="bi bi-check-circle-fill text-success me-2"></i>刷新完成';
+                    progressDetail.innerHTML = `<i class="bi bi-info-circle me-1"></i>${data.message}`;
+                    
+                    showToast(data.message, 'success', '刷新完成');
+                    
+                    eventSource.close();
+                    btn.disabled = false;
+                    btn.innerHTML = originalHtml;
+                    
+                    // 3秒后隐藏进度条并刷新页面
+                    setTimeout(() => {
+                        progressContainer.style.display = 'none';
+                        location.reload();
+                    }, 3000);
+                    break;
+                    
+                case 'error':
+                    progressBar.classList.remove('progress-bar-animated');
+                    progressBar.classList.add('bg-danger');
+                    progressTitle.innerHTML = '<i class="bi bi-exclamation-triangle-fill text-danger me-2"></i>刷新失败';
+                    progressDetail.innerHTML = `<i class="bi bi-x-circle text-danger me-1"></i>${data.message}`;
+                    
+                    showToast(data.message, 'error', '刷新失败');
+                    
+                    eventSource.close();
+                    btn.disabled = false;
+                    btn.innerHTML = originalHtml;
+                    
+                    // 5秒后隐藏进度条
+                    setTimeout(() => {
+                        progressContainer.style.display = 'none';
+                    }, 5000);
+                    break;
+            }
+        } catch (error) {
+            console.error('解析进度数据失败:', error);
         }
-    } catch (error) {
-        console.error('刷新失败:', error);
-        showToast(error.message, 'error', '刷新失败');
-    } finally {
+    };
+    
+    eventSource.onerror = function(error) {
+        console.error('EventSource 错误:', error);
+        eventSource.close();
+        
+        progressBar.classList.remove('progress-bar-animated');
+        progressBar.classList.add('bg-danger');
+        progressTitle.innerHTML = '<i class="bi bi-exclamation-triangle-fill text-danger me-2"></i>连接错误';
+        progressDetail.innerHTML = '<i class="bi bi-x-circle text-danger me-1"></i>与服务器的连接已断开';
+        
         btn.disabled = false;
         btn.innerHTML = originalHtml;
+        
+        showToast('与服务器的连接已断开', 'error', '刷新失败');
+        
+        setTimeout(() => {
+            progressContainer.style.display = 'none';
+        }, 5000);
+    };
+}
+
+// 导出有新增提交的项目
+async function exportProjectsWithNewCommits() {
+    try {
+        const response = await fetch('/api/monitor/export-new-commits');
+        
+        if (!response.ok) {
+            throw new Error('导出失败');
+        }
+        
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        
+        // 生成文件名：projects_with_new_commits_YYYYMMDD_HHMMSS.txt
+        const now = new Date();
+        const timestamp = now.getFullYear() + 
+                         String(now.getMonth() + 1).padStart(2, '0') + 
+                         String(now.getDate()).padStart(2, '0') + '_' +
+                         String(now.getHours()).padStart(2, '0') + 
+                         String(now.getMinutes()).padStart(2, '0') + 
+                         String(now.getSeconds()).padStart(2, '0');
+        a.download = `projects_with_new_commits_${timestamp}.txt`;
+        
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        window.URL.revokeObjectURL(url);
+        
+        showToast('导出成功', 'success', '导出完成');
+    } catch (error) {
+        console.error('导出失败:', error);
+        showToast(error.message, 'error', '导出失败');
     }
+}
+
+// 批量打包项目（暂未实现）
+function batchPackProjects() {
+    showToast('此功能暂未实现', 'info', '提示');
 }
 </script>
 {% endblock %}

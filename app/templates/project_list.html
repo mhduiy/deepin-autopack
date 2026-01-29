@@ -20,7 +20,7 @@
                 <th><i class="bi bi-folder"></i> 项目名</th>
                 <th><i class="bi bi-git"></i> Gerrit分支</th>
                 <th><i class="bi bi-github"></i> GitHub分支</th>
-                <th><i class="bi bi-chat-square-text"></i> 最后Commit</th>
+                <th><i class="bi bi-box-seam"></i> CRP项目名称</th>
                 <th><i class="bi bi-activity"></i> 仓库状态</th>
                 <th class="text-center"><i class="bi bi-gear"></i> 操作</th>
             </tr>
@@ -49,19 +49,20 @@
                             <i class="bi bi-github"></i> {{ project.github_branch }}
                         </span>
                     {% else %}
-                        <span class="text-muted">-</span>
+                        <span class="badge-modern badge-github">
+                            <i class="bi bi-github"></i> 未配置
+                        </span>
                     {% endif %}
                 </td>
                 <td>
-                    {% if item.commit_message %}
-                        <div class="commit-cell">
-                            <div class="commit-message">{{ item.commit_message }}</div>
-                            <code class="commit-hash">{{ project.last_commit_hash[:10] }}</code>
-                        </div>
-                    {% elif project.last_commit_hash %}
-                        <code class="commit-hash">{{ project.last_commit_hash[:10] }}...</code>
+                    {% if project.crp_project_name %}
+                        <span class="badge-modern badge-gerrit">
+                            <i class="bi bi-box-seam"></i> {{ project.crp_project_name }}
+                        </span>
                     {% else %}
-                        <span class="text-muted">暂无记录</span>
+                        <span class="badge-modern badge-gerrit">
+                            <i class="bi bi-box-seam"></i> {{ project.name }}-v25
+                        </span>
                     {% endif %}
                 </td>
                 <td>

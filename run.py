@@ -1,5 +1,13 @@
 from app import create_app
 import logging
+import os
+
+# 启动时自动取消代理设置
+proxy_vars = ['http_proxy', 'https_proxy', 'HTTP_PROXY', 'HTTPS_PROXY']
+for var in proxy_vars:
+    if var in os.environ:
+        del os.environ[var]
+        print(f"已取消环境变量: {var}")
 
 # 配置日志
 logging.basicConfig(
