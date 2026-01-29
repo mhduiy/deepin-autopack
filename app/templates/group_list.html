@@ -1,0 +1,171 @@
+{% extends "base.html" %}
+
+{% block title %}分组管理 - Deepin 自动打包工具{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2 class="mb-0">
+        <i class="bi bi-diagram-3 text-primary me-2"></i>分组管理
+    </h2>
+    <button class="btn btn-primary" onclick="showComingSoon()">
+        <i class="bi bi-plus-circle me-1"></i>新建分组
+    </button>
+</div>
+
+<!-- 精美的占位卡片 -->
+<div class="row g-4">
+    <div class="col-md-6 col-lg-4">
+        <div class="feature-card" onclick="showComingSoon()">
+            <div class="feature-icon">
+                <i class="bi bi-layers"></i>
+            </div>
+            <h4>创建分组</h4>
+            <p class="text-muted">将项目组织成不同的分组，便于批量管理和打包</p>
+            <div class="feature-badge">即将推出</div>
+        </div>
+    </div>
+    
+    <div class="col-md-6 col-lg-4">
+        <div class="feature-card" onclick="showComingSoon()">
+            <div class="feature-icon">
+                <i class="bi bi-box-seam"></i>
+            </div>
+            <h4>按组打包</h4>
+            <p class="text-muted">一键打包整个分组内的所有项目，提高效率</p>
+            <div class="feature-badge">即将推出</div>
+        </div>
+    </div>
+    
+    <div class="col-md-6 col-lg-4">
+        <div class="feature-card" onclick="showComingSoon()">
+            <div class="feature-icon">
+                <i class="bi bi-tags"></i>
+            </div>
+            <h4>标签管理</h4>
+            <p class="text-muted">为分组添加标签，支持按标签筛选和搜索</p>
+            <div class="feature-badge">即将推出</div>
+        </div>
+    </div>
+    
+    <div class="col-md-6 col-lg-4">
+        <div class="feature-card" onclick="showComingSoon()">
+            <div class="feature-icon">
+                <i class="bi bi-shuffle"></i>
+            </div>
+            <h4>批量操作</h4>
+            <p class="text-muted">批量添加、移动、删除项目，灵活管理</p>
+            <div class="feature-badge">即将推出</div>
+        </div>
+    </div>
+    
+    <div class="col-md-6 col-lg-4">
+        <div class="feature-card" onclick="showComingSoon()">
+            <div class="feature-icon">
+                <i class="bi bi-graph-up"></i>
+            </div>
+            <h4>统计分析</h4>
+            <p class="text-muted">查看分组内项目的统计信息和打包历史</p>
+            <div class="feature-badge">即将推出</div>
+        </div>
+    </div>
+    
+    <div class="col-md-6 col-lg-4">
+        <div class="feature-card" onclick="showComingSoon()">
+            <div class="feature-icon">
+                <i class="bi bi-share"></i>
+            </div>
+            <h4>分组共享</h4>
+            <p class="text-muted">导出和导入分组配置，方便团队协作</p>
+            <div class="feature-badge">即将推出</div>
+        </div>
+    </div>
+</div>
+
+<style>
+.feature-card {
+    background: white;
+    border-radius: 16px;
+    padding: 2rem;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    border: 2px solid #f0f0f0;
+    position: relative;
+    overflow: hidden;
+    height: 100%;
+}
+
+.feature-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 4px;
+    background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+    transform: scaleX(0);
+    transition: transform 0.3s ease;
+}
+
+.feature-card:hover {
+    transform: translateY(-8px);
+    box-shadow: 0 12px 40px rgba(102, 126, 234, 0.2);
+    border-color: #667eea;
+}
+
+.feature-card:hover::before {
+    transform: scaleX(1);
+}
+
+.feature-icon {
+    width: 80px;
+    height: 80px;
+    margin: 0 auto 1.5rem;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border-radius: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 2.5rem;
+    color: white;
+    transition: all 0.3s ease;
+}
+
+.feature-card:hover .feature-icon {
+    transform: scale(1.1) rotate(5deg);
+    box-shadow: 0 8px 24px rgba(102, 126, 234, 0.4);
+}
+
+.feature-card h4 {
+    font-size: 1.25rem;
+    font-weight: 600;
+    margin-bottom: 0.75rem;
+    color: #2c3e50;
+}
+
+.feature-card p {
+    font-size: 0.95rem;
+    line-height: 1.6;
+    margin-bottom: 0;
+}
+
+.feature-badge {
+    position: absolute;
+    top: 1rem;
+    right: 1rem;
+    background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+    color: white;
+    padding: 0.375rem 0.875rem;
+    border-radius: 20px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    box-shadow: 0 4px 12px rgba(245, 87, 108, 0.3);
+}
+</style>
+
+<script>
+function showComingSoon() {
+    showToast('此功能正在开发中，敬请期待！', 'info', '即将推出');
+}
+</script>
+{% endblock %}

@@ -19,11 +19,13 @@ def create_app():
     from app.routes.monitor import monitor_bp
     from app.routes.crp import crp_bp
     from app.routes.build import build_bp
+    from app.routes.group import group_bp
     app.register_blueprint(project_bp)
     app.register_blueprint(config_bp)
     app.register_blueprint(monitor_bp)
     app.register_blueprint(crp_bp)
     app.register_blueprint(build_bp)
+    app.register_blueprint(group_bp)
     
     # 创建数据库表
     with app.app_context():

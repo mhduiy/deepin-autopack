@@ -418,6 +418,12 @@
                 </a>
             </div>
             <div class="nav-item">
+                <a class="nav-link {% if request.endpoint and request.endpoint.startswith('group.') %}active{% endif %}" href="{{ url_for('group.group_list') }}">
+                    <i class="bi bi-diagram-3"></i>
+                    <span class="nav-link-text">分组管理</span>
+                </a>
+            </div>
+            <div class="nav-item">
                 <a class="nav-link {% if request.endpoint and request.endpoint.startswith('monitor.') %}active{% endif %}" href="{{ url_for('monitor.monitor') }}">
                     <i class="bi bi-activity"></i>
                     <span class="nav-link-text">提交监控</span>
@@ -445,7 +451,7 @@
         
         <!-- 页脚 -->
         <div class="sidebar-footer">
-            <div class="sidebar-footer-text">v1.0 · 简约高效</div>
+            <div class="sidebar-footer-text">v1.0 · deepin-autopack</div>
         </div>
     </div>
 
@@ -607,5 +613,438 @@
     </script>
     
     {% block scripts %}{% endblock %}
+
+    <!-- AI助手悬浮按钮 -->
+    <button class="ai-assistant-btn" onclick="toggleAIAssistant()" id="aiAssistantBtn">
+        <div class="ai-btn-icon">
+            <i class="bi bi-stars"></i>
+        </div>
+        <div class="ai-btn-pulse"></div>
+    </button>
+
+    <!-- AI助手弹框 -->
+    <div class="ai-assistant-modal" id="aiAssistantModal">
+        <div class="ai-modal-header">
+            <div class="ai-modal-title">
+                <div class="ai-title-icon">
+                    <i class="bi bi-stars"></i>
+                </div>
+                <div>
+                    <h5 class="mb-0">AI 智能助手</h5>
+                    <small class="text-muted">自然语言控制打包与仓库管理</small>
+                </div>
+            </div>
+            <button class="ai-modal-close" onclick="closeAIAssistant()">
+                <i class="bi bi-x-lg"></i>
+            </button>
+        </div>
+        
+        <div class="ai-modal-body">
+            <!-- 欢迎消息 -->
+            <div class="ai-welcome-message">
+                <div class="ai-avatar">
+                    <i class="bi bi-robot"></i>
+                </div>
+                <div class="ai-message-content">
+                    <p class="mb-2"><strong>你好！我是 AI 智能助手 ✨</strong></p>
+                    <p class="mb-0">我可以帮你完成以下操作：</p>
+                    <ul class="ai-capabilities">
+                        <li><i class="bi bi-check-circle-fill text-success me-2"></i>查看项目和仓库信息</li>
+                        <li><i class="bi bi-check-circle-fill text-success me-2"></i>智能打包和版本管理</li>
+                        <li><i class="bi bi-check-circle-fill text-success me-2"></i>批量操作和任务调度</li>
+                        <li><i class="bi bi-check-circle-fill text-success me-2"></i>提交监控和代码分析</li>
+                    </ul>
+                    <div class="ai-coming-soon">
+                        <i class="bi bi-info-circle me-2"></i>
+                        此功能正在紧张开发中，敬请期待！
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 示例问题 -->
+            <div class="ai-examples">
+                <div class="ai-example-title">试试这些问题：</div>
+                <div class="ai-example-items">
+                    <div class="ai-example-item" onclick="fillExample(this)">
+                        <i class="bi bi-chat-dots me-2"></i>
+                        显示所有有新增提交的项目
+                    </div>
+                    <div class="ai-example-item" onclick="fillExample(this)">
+                        <i class="bi bi-chat-dots me-2"></i>
+                        打包 deepin-music 项目
+                    </div>
+                    <div class="ai-example-item" onclick="fillExample(this)">
+                        <i class="bi bi-chat-dots me-2"></i>
+                        查看最近的打包任务
+                    </div>
+                    <div class="ai-example-item" onclick="fillExample(this)">
+                        <i class="bi bi-chat-dots me-2"></i>
+                        列出所有失败的构建
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="ai-modal-footer">
+            <div class="ai-input-wrapper">
+                <input type="text" 
+                       class="ai-input" 
+                       id="aiInput"
+                       placeholder="输入你的问题或指令..." 
+                       disabled>
+                <button class="ai-send-btn" disabled>
+                    <i class="bi bi-send-fill"></i>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <style>
+    /* AI助手悬浮按钮 */
+    .ai-assistant-btn {
+        position: fixed;
+        left: 30px;
+        bottom: 30px;
+        width: 64px;
+        height: 64px;
+        background: linear-gradient(135deg, #FF6B6B 0%, #FF8E53 100%);
+        border: 3px solid white;
+        border-radius: 50%;
+        box-shadow: 0 8px 24px rgba(255, 107, 107, 0.5);
+        cursor: pointer;
+        z-index: 1100;
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        overflow: visible;
+    }
+
+    .ai-assistant-btn:hover {
+        transform: scale(1.15) rotate(5deg);
+        box-shadow: 0 12px 32px rgba(255, 107, 107, 0.6);
+        background: linear-gradient(135deg, #FF8E53 0%, #FF6B6B 100%);
+    }
+
+    .ai-assistant-btn.active {
+        transform: scale(0.95);
+    }
+
+    .ai-btn-icon {
+        position: relative;
+        z-index: 2;
+        color: white;
+        font-size: 2rem;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        animation: aiIconFloat 3s ease-in-out infinite;
+        filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.2));
+    }
+
+    @keyframes aiIconFloat {
+        0%, 100% { transform: translateY(0) rotate(0deg); }
+        50% { transform: translateY(-4px) rotate(10deg); }
+    }
+
+    .ai-btn-pulse {
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        border-radius: 50%;
+        background: linear-gradient(135deg, #FF6B6B 0%, #FF8E53 100%);
+        animation: aiPulse 2s ease-out infinite;
+        opacity: 0;
+    }
+
+    @keyframes aiPulse {
+        0% {
+            transform: scale(1);
+            opacity: 0.6;
+        }
+        100% {
+            transform: scale(1.8);
+            opacity: 0;
+        }
+    }
+
+    /* AI助手弹框 */
+    .ai-assistant-modal {
+        position: fixed;
+        left: 30px;
+        bottom: 100px;
+        width: 420px;
+        max-height: 600px;
+        background: white;
+        border-radius: 20px;
+        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2);
+        z-index: 1099;
+        display: none;
+        flex-direction: column;
+        opacity: 0;
+        transform: translateY(20px) scale(0.95);
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    .ai-assistant-modal.show {
+        display: flex;
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+
+    .ai-modal-header {
+        padding: 1.5rem;
+        border-bottom: 1px solid #f0f0f0;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        background: linear-gradient(135deg, rgba(102, 126, 234, 0.05) 0%, rgba(118, 75, 162, 0.05) 100%);
+        border-radius: 20px 20px 0 0;
+    }
+
+    .ai-modal-title {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+    }
+
+    .ai-title-icon {
+        width: 40px;
+        height: 40px;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        border-radius: 10px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        font-size: 1.25rem;
+        animation: aiTitlePulse 2s ease-in-out infinite;
+    }
+
+    @keyframes aiTitlePulse {
+        0%, 100% { transform: scale(1); }
+        50% { transform: scale(1.05); }
+    }
+
+    .ai-modal-close {
+        width: 32px;
+        height: 32px;
+        border: none;
+        background: rgba(0, 0, 0, 0.05);
+        border-radius: 8px;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: #666;
+        transition: all 0.2s ease;
+    }
+
+    .ai-modal-close:hover {
+        background: rgba(0, 0, 0, 0.1);
+        color: #333;
+    }
+
+    .ai-modal-body {
+        padding: 1.5rem;
+        overflow-y: auto;
+        flex: 1;
+    }
+
+    .ai-welcome-message {
+        display: flex;
+        gap: 1rem;
+        margin-bottom: 2rem;
+    }
+
+    .ai-avatar {
+        width: 48px;
+        height: 48px;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        border-radius: 12px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        font-size: 1.5rem;
+        flex-shrink: 0;
+    }
+
+    .ai-message-content {
+        flex: 1;
+    }
+
+    .ai-capabilities {
+        list-style: none;
+        padding: 0;
+        margin: 1rem 0;
+    }
+
+    .ai-capabilities li {
+        padding: 0.5rem 0;
+        display: flex;
+        align-items: center;
+    }
+
+    .ai-coming-soon {
+        background: linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(118, 75, 162, 0.1) 100%);
+        padding: 0.75rem 1rem;
+        border-radius: 10px;
+        margin-top: 1rem;
+        display: flex;
+        align-items: center;
+        color: #667eea;
+        font-weight: 500;
+    }
+
+    .ai-examples {
+        margin-top: 1.5rem;
+    }
+
+    .ai-example-title {
+        font-size: 0.875rem;
+        font-weight: 600;
+        color: #666;
+        margin-bottom: 0.75rem;
+    }
+
+    .ai-example-items {
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+    }
+
+    .ai-example-item {
+        padding: 0.75rem 1rem;
+        background: #f8f9fa;
+        border-radius: 10px;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        display: flex;
+        align-items: center;
+        font-size: 0.9rem;
+    }
+
+    .ai-example-item:hover {
+        background: #e9ecef;
+        transform: translateX(4px);
+    }
+
+    .ai-modal-footer {
+        padding: 1rem 1.5rem;
+        border-top: 1px solid #f0f0f0;
+    }
+
+    .ai-input-wrapper {
+        display: flex;
+        gap: 0.5rem;
+        align-items: center;
+    }
+
+    .ai-input {
+        flex: 1;
+        padding: 0.75rem 1rem;
+        border: 2px solid #e9ecef;
+        border-radius: 12px;
+        font-size: 0.95rem;
+        transition: all 0.2s ease;
+    }
+
+    .ai-input:focus {
+        outline: none;
+        border-color: #667eea;
+        box-shadow: 0 0 0 4px rgba(102, 126, 234, 0.1);
+    }
+
+    .ai-input:disabled {
+        background: #f8f9fa;
+        cursor: not-allowed;
+    }
+
+    .ai-send-btn {
+        width: 44px;
+        height: 44px;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        border: none;
+        border-radius: 12px;
+        color: white;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.1rem;
+        transition: all 0.2s ease;
+    }
+
+    .ai-send-btn:hover:not(:disabled) {
+        transform: scale(1.05);
+        box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+    }
+
+    .ai-send-btn:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+    }
+
+    /* 响应式 */
+    @media (max-width: 768px) {
+        .ai-assistant-modal {
+            left: 10px;
+            right: 10px;
+            width: auto;
+            max-height: 500px;
+        }
+        
+        .ai-assistant-btn {
+            left: 20px;
+            bottom: 20px;
+            width: 50px;
+            height: 50px;
+        }
+    }
+    </style>
+
+    <script>
+    // AI助手相关函数
+    function toggleAIAssistant() {
+        const modal = document.getElementById('aiAssistantModal');
+        const btn = document.getElementById('aiAssistantBtn');
+        
+        if (modal.classList.contains('show')) {
+            closeAIAssistant();
+        } else {
+            modal.classList.add('show');
+            btn.classList.add('active');
+        }
+    }
+
+    function closeAIAssistant() {
+        const modal = document.getElementById('aiAssistantModal');
+        const btn = document.getElementById('aiAssistantBtn');
+        
+        modal.classList.remove('show');
+        btn.classList.remove('active');
+    }
+
+    function fillExample(element) {
+        const text = element.textContent.trim();
+        const input = document.getElementById('aiInput');
+        input.value = text;
+        
+        // 显示即将推出提示
+        showToast('AI助手功能正在开发中，敬请期待！', 'info', 'AI助手');
+    }
+
+    // 点击弹框外部关闭
+    document.addEventListener('click', function(event) {
+        const modal = document.getElementById('aiAssistantModal');
+        const btn = document.getElementById('aiAssistantBtn');
+        
+        if (modal && modal.classList.contains('show')) {
+            if (!modal.contains(event.target) && !btn.contains(event.target)) {
+                closeAIAssistant();
+            }
+        }
+    });
+    </script>
 </body>
 </html>
