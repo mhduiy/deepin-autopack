@@ -58,7 +58,7 @@ def project_create():
                 github_url=request.form.get('github_url'),
                 github_branch=request.form.get('github_branch'),
                 last_commit_hash=request.form.get('last_commit_hash'),
-                crp_project_name=request.form.get('crp_project_name') or None,  # CRP项目名，默认为None（使用name-v25）
+                crp_project_name=request.form.get('crp_project_name') or None,
                 repo_status='pending'
             )
             db.session.add(project)

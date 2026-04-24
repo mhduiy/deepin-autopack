@@ -5,7 +5,12 @@
 from flask import Blueprint, render_template, jsonify, request
 from app.services.build_task_service import BuildTaskService
 from app.models.build_task import BuildTask
+from app.services.github_service import GitHubService
+from app.services.workflow_service import WorkflowService
+from app.models import GlobalConfig
+from app.models.project import Project
 import logging
+import os
 
 logger = logging.getLogger(__name__)
 
@@ -103,7 +108,10 @@ def api_create_task():
                 'version': data['version'],
                 'architectures': data.get('architectures', []),
                 'crp_topic_id': data.get('crp_topic_id'),
-                'start_commit_hash': data.get('start_commit_hash', '')
+                'crp_topic_name': data.get('crp_topic_name'),
+                'start_commit_hash': data.get('start_commit_hash', ''),
+                'github_action_name': data.get('github_action_name'),
+                'github_action_params': data.get('github_action_params'),
             }
         )
         
@@ -323,4 +331,129 @@ def api_cleanup_completed_tasks():
         return jsonify({
             'success': False,
             'message': f'清理任务失败: {str(e)}'
+        }), 500
+
+@build_bp.route('/api/tasks/unmerged-prs', methods=['GET'])
+def api_get_unmerged_prs():
+    """获取所有未合并的PR列表"""
+    try:
+        # 获取所有任务
+        tasks = BuildTaskService.get_all_tasks(limit=1000)
+        
+        # 获取GitHub token（用于API调用）
+        config = GlobalConfig.get_config()
+        github_token = config.github_token if config else None
+        
+        # 只筛选未完成的任务（排除success和cancelled状态）
+        # 未完成的状态包括: pending, running, paused, failed
+        incomplete_statuses = ['pending', 'running', 'paused', 'failed']
+        unmerged_prs = []
+        
+        for task in tasks:
+            # 只处理未完成的任务
+            if task.get('status') not in incomplete_statuses:
+                continue
+                
+            # 检查是否有GitHub PR信息
+            if not task.get('github_pr_url') or not task.get('github_pr_number'):
+                continue
+            
+            pr_url = task.get('github_pr_url')
+            pr_number = task.get('github_pr_number')
+            
+            # 实时从GitHub API获取PR状态
+            pr_state = 'open'  # 默认状态
+            pr_merged = False
+            
+            try:
+                pr_info = GitHubService.get_pr_info_from_url(pr_url, github_token)
+                if pr_info:
+                    pr_state = pr_info.get('state', 'open')  # open, closed
+                    pr_merged = pr_info.get('merged', False)  # True/False
+                    
+                    logger.info(f"PR #{pr_number}: state={pr_state}, merged={pr_merged}")
+            except Exception as e:
+                logger.warning(f"无法获取PR #{pr_number} 的实时状态: {e}")
+            
+            # 只添加未合并的PR（open状态或closed但未merged）
+            if not pr_merged:
+                unmerged_prs.append({
+                    'task_id': task['id'],
+                    'project_name': task['project_name'],
+                    'version': task['version'],
+                    'pr_number': pr_number,
+                    'pr_url': pr_url,
+                    'pr_status': 'merged' if pr_merged else pr_state,
+                    'pr_merged': pr_merged,
+                    'created_at': task['created_at'],
+                    'task_status': task['status']
+                })
+        
+        # 按创建时间倒序排序
+        unmerged_prs.sort(key=lambda x: x['created_at'], reverse=True)
+        
+        logger.info(f"找到 {len(unmerged_prs)} 个未合并的PR（从 {len([t for t in tasks if t.get('status') in incomplete_statuses])} 个未完成任务中）")
+        
+        return jsonify({
+            'success': True,
+            'data': unmerged_prs,
+            'total': len(unmerged_prs)
+        })
+        
+    except Exception as e:
+        logger.exception(f"获取未合并PR列表失败: {e}")
+        return jsonify({
+            'success': False,
+            'message': f'获取未合并PR列表失败: {str(e)}'
+        }), 500
+
+
+@build_bp.route('/api/workflows/<project_name>', methods=['GET'])
+def api_get_workflows(project_name):
+    """获取项目的 GitHub Actions workflows"""
+    logger.info(f"[DEBUG] api_get_workflows 被调用, project_name: {project_name}")
+    try:
+        # 查找项目
+        project = Project.query.filter_by(name=project_name).first()
+        logger.info(f"[DEBUG] 查询到的项目: {project}")
+        if not project:
+            logger.warning(f"[DEBUG] 项目不存在: {project_name}")
+            return jsonify({
+                'success': False,
+                'message': f'项目 {project_name} 不存在'
+            }), 404
+        
+        # 使用项目的本地仓库路径
+        repo_path = project.local_repo_path
+        logger.info(f"[DEBUG] 项目仓库路径: {repo_path}")
+        
+        # 检查仓库是否存在
+        if not repo_path or not os.path.exists(repo_path):
+            return jsonify({
+                'success': False,
+                'message': f'仓库未克隆或路径不存在，请先在项目管理页面克隆仓库'
+            }), 404
+        
+        # 获取 workflows
+        workflows = WorkflowService.get_workflows(repo_path)
+        
+        if not workflows:
+            return jsonify({
+                'success': True,
+                'data': [],
+                'message': '该项目没有可手动触发的 workflow'
+            })
+        
+        logger.info(f"项目 {project_name} 找到 {len(workflows)} 个可手动触发的 workflow")
+        
+        return jsonify({
+            'success': True,
+            'data': workflows
+        })
+        
+    except Exception as e:
+        logger.exception(f"获取 workflows 失败: {e}")
+        return jsonify({
+            'success': False,
+            'message': f'获取 workflows 失败: {str(e)}'
         }), 500

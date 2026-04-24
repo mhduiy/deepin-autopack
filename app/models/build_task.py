@@ -13,12 +13,18 @@ class BuildTask(db.Model):
     project_name = db.Column(db.String(255), nullable=False)  # 冗余字段，方便查询
     
     # 打包配置
-    package_mode = db.Column(db.String(20), nullable=False)  # 'normal', 'changelog_only', 'crp_only'
+    package_mode = db.Column(db.String(20), nullable=False)  # 'normal', 'changelog_only', 'crp_only', 'github_action'
     version = db.Column(db.String(50), nullable=False)  # 版本号
     architectures = db.Column(db.JSON)  # 架构列表 ['amd64', 'arm64', 'loongarch64', 'riscv64']
     crp_topic_id = db.Column(db.String(50))  # CRP主题ID（可选）
     crp_topic_name = db.Column(db.String(255))  # CRP主题名称（可选）
     start_commit_hash = db.Column(db.String(40), nullable=False)  # 起始commit
+    
+    # GitHub Action 相关（package_mode='github_action' 时使用）
+    github_action_name = db.Column(db.String(200))  # GitHub Action workflow 名称
+    github_action_inputs = db.Column(db.Text)  # GitHub Action 输入参数（JSON格式）
+    github_action_run_id = db.Column(db.String(50))  # GitHub Action Run ID
+    github_action_run_url = db.Column(db.String(500))  # GitHub Action Run URL
     
     # 任务状态
     status = db.Column(db.String(20), default='pending')  
@@ -62,6 +68,10 @@ class BuildTask(db.Model):
             'version': self.version,
             'architectures': self.architectures or [],
             'crp_topic_id': self.crp_topic_id,
+            'github_action_name': self.github_action_name,
+            'github_action_inputs': self.github_action_inputs,
+            'github_action_run_id': self.github_action_run_id,
+            'github_action_run_url': self.github_action_run_url,
             'status': self.status,
             'current_step': self.current_step,
             'error_message': self.error_message,

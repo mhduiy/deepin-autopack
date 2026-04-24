@@ -30,6 +30,10 @@
                 <i class="bi bi-trash"></i> 清理已完成
             </button>
             
+            <button class="btn btn-outline-info" onclick="showUnmergedPRs()">
+                <i class="bi bi-git"></i> 未合并PR
+            </button>
+            
             <button class="btn btn-outline-primary" onclick="refreshTasks()">
                 <i class="bi bi-arrow-clockwise"></i> 刷新
             </button>
@@ -107,6 +111,44 @@
             </div>
             <div class="modal-body" id="taskDetailContent">
                 <!-- 详情内容动态加载 -->
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 未合并PR列表模态框 -->
+<div class="modal fade" id="unmergedPRModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content pr-modal-content">
+            <div class="modal-header pr-modal-header">
+                <h5 class="modal-title">
+                    <i class="bi bi-git me-2"></i>未合并的 Pull Request
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body pr-modal-body">
+                <div class="pr-actions mb-3">
+                    <button class="btn btn-success btn-copy-all" onclick="copyAllPRs()">
+                        <i class="bi bi-clipboard-check"></i> 一键复制所有
+                    </button>
+                    <span class="copy-feedback"></span>
+                </div>
+                
+                <div id="prLoadingSpinner" class="text-center py-5">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">加载中...</span>
+                    </div>
+                    <p class="mt-3 text-muted">正在加载 PR 列表...</p>
+                </div>
+                
+                <div id="prListContainer" style="display: none;">
+                    <!-- PR列表将在这里动态加载 -->
+                </div>
+                
+                <div id="prEmptyState" class="text-center py-5" style="display: none;">
+                    <i class="bi bi-check-circle" style="font-size: 3rem; color: #28a745;"></i>
+                    <p class="mt-3 text-muted">🎉 太棒了！当前所有任务的 PR 都已合并</p>
+                </div>
             </div>
         </div>
     </div>
@@ -306,6 +348,211 @@
     100% {
         transform: translateX(100%);
     }
+}
+
+/* PR模态框样式 */
+.pr-modal-content {
+    border: none;
+    border-radius: 16px;
+    overflow: hidden;
+    box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+}
+
+.pr-modal-header {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    padding: 1.5rem;
+    border: none;
+}
+
+.pr-modal-header .modal-title {
+    font-weight: 600;
+    font-size: 1.25rem;
+}
+
+.pr-modal-body {
+    padding: 1.5rem;
+    max-height: 70vh;
+    overflow-y: auto;
+}
+
+.pr-actions {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.btn-copy-all {
+    font-weight: 600;
+    border-radius: 8px;
+    padding: 0.6rem 1.5rem;
+    transition: all 0.3s ease;
+    box-shadow: 0 2px 8px rgba(40, 167, 69, 0.3);
+}
+
+.btn-copy-all:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(40, 167, 69, 0.4);
+}
+
+.copy-feedback {
+    color: #28a745;
+    font-weight: 600;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+    animation: fadeInOut 2s ease;
+}
+
+@keyframes fadeInOut {
+    0%, 100% { opacity: 0; }
+    20%, 80% { opacity: 1; }
+}
+
+.pr-item {
+    background: white;
+    border: 2px solid #e9ecef;
+    border-radius: 12px;
+    padding: 1.25rem;
+    margin-bottom: 1rem;
+    transition: all 0.3s ease;
+    position: relative;
+    overflow: hidden;
+    animation: slideInUp 0.4s ease;
+}
+
+@keyframes slideInUp {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.pr-item:hover {
+    border-color: #667eea;
+    box-shadow: 0 4px 16px rgba(102, 126, 234, 0.15);
+    transform: translateX(4px);
+}
+
+.pr-item::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 4px;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    opacity: 0;
+    transition: opacity 0.3s ease;
+}
+
+.pr-item:hover::before {
+    opacity: 1;
+}
+
+.pr-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 0.75rem;
+}
+
+.pr-title {
+    font-size: 1rem;
+    font-weight: 600;
+    color: #2c3e50;
+    margin: 0 0 0.5rem 0;
+    flex: 1;
+}
+
+.pr-number {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    padding: 0.25rem 0.75rem;
+    border-radius: 20px;
+    font-size: 0.875rem;
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.pr-meta {
+    display: flex;
+    gap: 1rem;
+    font-size: 0.875rem;
+    color: #6c757d;
+    margin-bottom: 0.75rem;
+}
+
+.pr-meta-item {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+}
+
+.pr-url {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: #f8f9fa;
+    padding: 0.75rem;
+    border-radius: 8px;
+    margin-top: 0.75rem;
+}
+
+.pr-link {
+    color: #667eea;
+    text-decoration: none;
+    font-size: 0.875rem;
+    font-family: 'Courier New', monospace;
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.pr-link:hover {
+    text-decoration: underline;
+}
+
+.btn-copy-pr {
+    background: white;
+    border: 1px solid #dee2e6;
+    color: #495057;
+    padding: 0.375rem 0.75rem;
+    border-radius: 6px;
+    font-size: 0.875rem;
+    transition: all 0.2s ease;
+}
+
+.btn-copy-pr:hover {
+    background: #667eea;
+    color: white;
+    border-color: #667eea;
+    transform: scale(1.05);
+}
+
+.btn-copy-pr.copied {
+    background: #28a745;
+    color: white;
+    border-color: #28a745;
+}
+
+.pr-status-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.25rem 0.75rem;
+    border-radius: 20px;
+    font-size: 0.75rem;
+    font-weight: 600;
+}
+
+.pr-status-open {
+    background: #fff3cd;
+    color: #856404;
 }
 
 .task-progress-text {
@@ -1120,6 +1367,172 @@ async function cleanupCompletedTasks() {
             showToast(`清理任务失败：${error.message}`, 'error');
         });
     }
+}
+
+// 显示未合并的PR列表
+async function showUnmergedPRs() {
+    const modal = new bootstrap.Modal(document.getElementById('unmergedPRModal'));
+    modal.show();
+    
+    // 显示加载状态
+    document.getElementById('prLoadingSpinner').style.display = 'block';
+    document.getElementById('prListContainer').style.display = 'none';
+    document.getElementById('prEmptyState').style.display = 'none';
+    
+    try {
+        const response = await fetch('/api/tasks/unmerged-prs');
+        const data = await response.json();
+        
+        if (!data.success) {
+            throw new Error(data.message || '获取PR列表失败');
+        }
+        
+        // 隐藏加载状态
+        document.getElementById('prLoadingSpinner').style.display = 'none';
+        
+        if (data.data && data.data.length > 0) {
+            // 显示PR列表
+            renderPRList(data.data);
+            document.getElementById('prListContainer').style.display = 'block';
+        } else {
+            // 显示空状态
+            document.getElementById('prEmptyState').style.display = 'block';
+        }
+    } catch (error) {
+        console.error('获取PR列表失败:', error);
+        document.getElementById('prLoadingSpinner').style.display = 'none';
+        document.getElementById('prListContainer').innerHTML = `
+            <div class="alert alert-danger">
+                <i class="bi bi-exclamation-triangle"></i>
+                获取PR列表失败：${error.message}
+            </div>
+        `;
+        document.getElementById('prListContainer').style.display = 'block';
+    }
+}
+
+// 渲染PR列表
+function renderPRList(prList) {
+    const container = document.getElementById('prListContainer');
+    let html = '<div class="pr-list">';
+    
+    prList.forEach((pr, index) => {
+        html += `
+            <div class="pr-item" style="animation-delay: ${index * 0.05}s">
+                <div class="pr-header">
+                    <div>
+                        <h6 class="pr-title">${escapeHtml(pr.project_name)}</h6>
+                        <span class="pr-number">#${pr.pr_number}</span>
+                    </div>
+                </div>
+                <div class="pr-meta">
+                    <div class="pr-meta-item">
+                        <i class="bi bi-box"></i>
+                        <span>版本: ${escapeHtml(pr.version)}</span>
+                    </div>
+                    <div class="pr-meta-item">
+                        <i class="bi bi-clock"></i>
+                        <span>${formatDate(pr.created_at)}</span>
+                    </div>
+                    ${pr.pr_status ? `
+                    <div class="pr-meta-item">
+                        <span class="pr-status-badge pr-status-${pr.pr_status}">
+                            <i class="bi bi-circle-fill"></i>
+                            ${pr.pr_status}
+                        </span>
+                    </div>
+                    ` : ''}
+                </div>
+                <div class="pr-url">
+                    <a href="${pr.pr_url}" target="_blank" class="pr-link" title="${pr.pr_url}">
+                        ${pr.pr_url}
+                    </a>
+                    <button class="btn-copy-pr" onclick="copySinglePR('${pr.pr_url}', this)">
+                        <i class="bi bi-clipboard"></i> 复制
+                    </button>
+                </div>
+            </div>
+        `;
+    });
+    
+    html += '</div>';
+    container.innerHTML = html;
+}
+
+// 复制单个PR链接
+function copySinglePR(url, button) {
+    navigator.clipboard.writeText(url).then(() => {
+        const originalHTML = button.innerHTML;
+        button.innerHTML = '<i class="bi bi-check"></i> 已复制';
+        button.classList.add('copied');
+        
+        setTimeout(() => {
+            button.innerHTML = originalHTML;
+            button.classList.remove('copied');
+        }, 2000);
+    }).catch(err => {
+        console.error('复制失败:', err);
+        showToast('复制失败', 'error');
+    });
+}
+
+// 一键复制所有PR链接
+async function copyAllPRs() {
+    try {
+        const response = await fetch('/api/tasks/unmerged-prs');
+        const data = await response.json();
+        
+        if (!data.success || !data.data || data.data.length === 0) {
+            showToast('没有可复制的PR', 'warning');
+            return;
+        }
+        
+        // 生成格式化的文本
+        const prText = data.data.map(pr => {
+            return `【${pr.project_name}】 v${pr.version} - #${pr.pr_number}\n${pr.pr_url}`;
+        }).join('\n\n');
+        
+        await navigator.clipboard.writeText(prText);
+        
+        // 显示复制成功的反馈
+        const feedback = document.querySelector('.copy-feedback');
+        feedback.textContent = `✓ 已复制 ${data.data.length} 个 PR 链接`;
+        feedback.style.opacity = '1';
+        
+        setTimeout(() => {
+            feedback.style.opacity = '0';
+        }, 2500);
+        
+        showToast(`已复制 ${data.data.length} 个 PR 链接到剪贴板`, 'success');
+        
+    } catch (error) {
+        console.error('复制失败:', error);
+        showToast('复制失败：' + error.message, 'error');
+    }
+}
+
+// HTML转义函数
+function escapeHtml(text) {
+    if (!text) return '';
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
+// 格式化日期
+function formatDate(dateString) {
+    if (!dateString) return '';
+    const date = new Date(dateString);
+    const now = new Date();
+    const diff = now - date;
+    const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+    const hours = Math.floor(diff / (1000 * 60 * 60));
+    const minutes = Math.floor(diff / (1000 * 60));
+    
+    if (days > 0) return `${days}天前`;
+    if (hours > 0) return `${hours}小时前`;
+    if (minutes > 0) return `${minutes}分钟前`;
+    return '刚刚';
 }
 
 </script>

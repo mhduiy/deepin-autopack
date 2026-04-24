@@ -819,8 +819,8 @@ function renderReleases(releases) {
                             <i class="bi bi-eye"></i>
                         </button>
                         <button class="btn btn-sm btn-warning-modern" 
-                                onclick="retryBuild(${release.id}, '${release.project_name}')"
-                                title="重试构建">
+                                onclick="retryBuild(${release.id}, '${release.project_name}', ${release.build_id})"
+                                title="重试所有失败架构">
                             <i class="bi bi-arrow-clockwise"></i>
                         </button>
                         <button class="btn btn-sm btn-danger-modern" 
@@ -882,27 +882,107 @@ function viewDetails(buildId) {
     window.open(`https://shuttle.uniontech.com/#/tasks/task?taskid=${buildId}`, '_blank');
 }
 
-// 重试构建
-function retryBuild(releaseId, projectName) {
-    if (!confirm(`确定要重试构建 ${projectName} 吗？`)) {
-        return;
-    }
+// 重试构建 - 重试所有失败的架构
+async function retryBuild(releaseId, projectName, buildId) {
+    const confirmed = await customConfirm(
+        `确定要重试 ${projectName} 所有失败的架构吗？`,
+        '重试构建',
+        'arrow-clockwise',
+        'warning'
+    );
     
-    fetch(`/crp/api/releases/${releaseId}/retry`, {
-        method: 'POST'
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.success) {
-            alert('已触发重新构建');
-            location.reload();
-        } else {
-            alert('操作失败: ' + data.message);
+    if (!confirmed) return;
+    
+    try {
+        // 获取维护者姓名作为username
+        const configResponse = await fetch('/config/api/config');
+        const configResult = await configResponse.json();
+        
+        if (!configResult.success || !configResult.data.maintainer_name) {
+            showToast('未配置维护者姓名，请先在配置页面设置', 'error');
+            return;
         }
-    })
-    .catch(err => {
-        alert('请求失败: ' + err);
-    });
+        
+        const username = configResult.data.maintainer_name;
+        
+        // 获取架构状态
+        const statusResponse = await fetch('https://shuttle.uniontech.com/api/shuttle/task/list', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                params: { taskid: buildId.toString() },
+                pageSize: 20,
+                current: 1
+            })
+        });
+        
+        const statusData = await statusResponse.json();
+        
+        if (!statusData.tasks || !statusData.tasks[0] || !statusData.tasks[0].jobs) {
+            showToast('无法获取架构状态', 'error');
+            return;
+        }
+        
+        const jobs = statusData.tasks[0].jobs;
+        const failedJobs = jobs.filter(job => job.status === 'FAILED');
+        
+        if (failedJobs.length === 0) {
+            showToast('没有失败的架构需要重试', 'info');
+            return;
+        }
+        
+        showToast(`正在重试 ${failedJobs.length} 个失败的架构...`, 'info');
+        
+        // 重试所有失败的架构
+        let successCount = 0;
+        let failCount = 0;
+        
+        for (const job of failedJobs) {
+            try {
+                const rebuildResponse = await fetch('https://shuttle.uniontech.com/api/shuttle/job/rebuild', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        jobid: job.id,
+                        username: username
+                    })
+                });
+                
+                const rebuildData = await rebuildResponse.json();
+                
+                if (rebuildData.code === 0) {
+                    successCount++;
+                } else {
+                    failCount++;
+                    console.error(`重试 ${job.arch} 失败:`, rebuildData.message);
+                }
+            } catch (err) {
+                failCount++;
+                console.error(`重试 ${job.arch} 异常:`, err);
+            }
+        }
+        
+        if (successCount === failedJobs.length) {
+            showToast(`已成功重试 ${successCount} 个架构`, 'success');
+        } else if (successCount > 0) {
+            showToast(`重试完成: 成功 ${successCount} 个，失败 ${failCount} 个`, 'warning');
+        } else {
+            showToast('所有架构重试失败', 'error');
+        }
+        
+        // 重新加载架构状态
+        setTimeout(() => {
+            loadArchStatus(buildId);
+        }, 1000);
+        
+    } catch (error) {
+        console.error('重试构建失败:', error);
+        showToast(`重试失败: ${error.message}`, 'error');
+    }
 }
 
 // 放弃打包
