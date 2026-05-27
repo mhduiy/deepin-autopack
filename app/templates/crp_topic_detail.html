@@ -455,9 +455,50 @@
     }
 }
 </style>
+<!-- 日志查看器模态框 -->
+<div class="modal fade" id="logViewerModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-scrollable">
+        <div class="modal-content" style="border: none; border-radius: 16px;">
+            <div class="modal-header" style="background: linear-gradient(135deg, #1e293b, #334155); color: white; border-radius: 16px 16px 0 0;">
+                <h5 class="modal-title">
+                    <i class="bi bi-file-text me-2"></i>
+                    <span id="logViewerTitle">构建日志</span>
+                </h5>
+                <div>
+                    <button class="btn btn-sm btn-outline-info me-2" id="logAIAnalyzeBtn" style="display:none;" onclick="runAIAnalysis()">
+                        <i class="bi bi-robot"></i> AI 分析
+                    </button>
+                    <button class="btn btn-sm btn-outline-warning me-2" id="logRetryBtn" style="display:none;" onclick="retryJobFromLog()">
+                        <i class="bi bi-arrow-clockwise"></i> 重试此架构
+                    </button>
+                    <a href="#" id="logShuttleLink" target="_blank" class="btn btn-sm btn-outline-light me-2">
+                        <i class="bi bi-box-arrow-up-right"></i> Shuttle
+                    </a>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+            </div>
+            <div class="modal-body bg-dark" style="padding: 1rem;">
+                <div id="logViewerContent" style="background: #0f172a; color: #e2e8f0; padding: 1.25rem; border-radius: 8px; font-family: 'Courier New', Consolas, monospace; font-size: 0.8rem; line-height: 1.5; white-space: pre-wrap; word-break: break-all; max-height: 50vh; overflow-y: auto;">
+                    <div class="text-center py-5 text-muted">
+                        <div class="spinner-border mb-3" role="status"></div>
+                        <p>正在加载构建日志...</p>
+                    </div>
+                </div>
+                <div id="aiAnalysisResult" style="display:none; margin-top: 1rem; background: #1a1a2e; padding: 1.25rem; border-radius: 8px; border-left: 3px solid #0dcaf0; max-height: 30vh; overflow-y: auto;">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-sm btn-outline-secondary" onclick="copyBuildLog()">
+                    <i class="bi bi-clipboard me-1"></i>复制日志
+                </button>
+                <button class="btn btn-sm btn-secondary" data-bs-dismiss="modal">关闭</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 
 <script>
-// 从URL获取topic_id
 const topicId = {{ topic_id }};
 
 // 页面加载时获取数据
@@ -672,13 +713,15 @@ async function loadArchStatus(buildId) {
                 } else if (status.includes('BUILD') && !status.includes('OK')) {
                     btnClass = 'building';
                 }
-                
-                const onclick = clickable ? `onclick="retryArchBuild(${job.id}, '${job.arch}', ${buildId})"` : '';
+
+                const onclick = clickable ? `onclick="viewJobLog(${job.id}, '${job.arch}', ${buildId}, '${status}')"` : '';
+                const title = clickable ? `${job.arch}: ${status} — 点击查看日志` : `${job.arch}: ${status}`;
                 buttonsHTML += `
-                    <button class="arch-btn ${btnClass}" 
-                            title="${job.arch}: ${status}" 
+                    <button class="arch-btn ${btnClass}"
+                            title="${title}"
                             ${onclick}>
                         ${job.arch}
+                        ${clickable ? '<span style="font-size:0.65rem;margin-left:2px;">📋</span>' : ''}
                     </button>
                 `;
             });
@@ -813,17 +856,17 @@ function renderReleases(releases) {
                 </td>
                 <td class="text-center">
                     <div class="btn-group" role="group">
-                        <button class="btn btn-sm btn-info-modern" 
+                        <button class="btn btn-sm btn-info-modern"
                                 onclick="viewDetails(${release.build_id})"
-                                title="查看详情">
-                            <i class="bi bi-eye"></i>
+                                title="在 Shuttle 中查看">
+                            <i class="bi bi-box-arrow-up-right"></i> Shuttle
                         </button>
-                        <button class="btn btn-sm btn-warning-modern" 
+                        <button class="btn btn-sm btn-warning-modern"
                                 onclick="retryBuild(${release.id}, '${release.project_name}', ${release.build_id})"
                                 title="重试所有失败架构">
                             <i class="bi bi-arrow-clockwise"></i>
                         </button>
-                        <button class="btn btn-sm btn-danger-modern" 
+                        <button class="btn btn-sm btn-danger-modern"
                                 onclick="abandonRelease(${release.id}, '${release.project_name}')"
                                 title="放弃打包">
                             <i class="bi bi-trash"></i>
@@ -1006,5 +1049,200 @@ function abandonRelease(releaseId, projectName) {
         alert('请求失败: ' + err);
     });
 }
+
+
+// 查看单个架构的构建日志 - 从 Shuttle 获取并显示
+let currentJobInfo = null;
+let currentBuildLog = '';
+
+async function viewJobLog(jobId, arch, buildId, status) {
+    currentJobInfo = { jobId, arch, buildId, status };
+    currentBuildLog = '';
+
+    const modal = new bootstrap.Modal(document.getElementById('logViewerModal'));
+    document.getElementById('logViewerTitle').textContent = arch + ' 构建日志';
+    document.getElementById('logShuttleLink').href = 'https://shuttle.uniontech.com/#/details/build?jobId=' + jobId;
+    document.getElementById('logViewerContent').textContent = '';
+    document.getElementById('logViewerContent').style.whiteSpace = 'pre-wrap';
+
+    // Hide AI result and buttons initially
+    document.getElementById('aiAnalysisResult').style.display = 'none';
+    document.getElementById('logAIAnalyzeBtn').style.display = 'none';
+
+    // Show retry button only for FAILED jobs
+    const retryBtn = document.getElementById('logRetryBtn');
+    if (retryBtn) {
+        retryBtn.style.display = (status === 'FAILED') ? '' : 'none';
+    }
+
+    document.getElementById('logViewerContent').innerHTML = `
+        <div class="text-center py-5" style="color: #94a3b8;">
+            <div class="spinner-border mb-3" role="status"></div>
+            <p>正在加载 ${arch} 构建日志...</p>
+        </div>
+    `;
+    modal.show();
+
+    try {
+        const resp = await fetch('/api/shuttle/log/' + jobId);
+        const result = await resp.json();
+        if (result.success && result.data) {
+            currentBuildLog = result.data;
+            document.getElementById('logViewerContent').textContent = result.data;
+            // Show AI analyze button once log is loaded
+            document.getElementById('logAIAnalyzeBtn').style.display = '';
+        } else {
+            document.getElementById('logViewerContent').innerHTML =
+                '<div class="text-center py-4" style="color: #f87171;">日志获取失败: ' + (result.message || '未知错误') + '</div>';
+        }
+    } catch (e) {
+        console.error('加载日志失败:', e);
+        document.getElementById('logViewerContent').innerHTML =
+            '<div class="text-center py-4 text-danger"><i class="bi bi-exclamation-triangle me-2"></i>' + e.message + '</div>';
+    }
+}
+
+async function runAIAnalysis() {
+    if (!currentJobInfo) return;
+    const { jobId, arch } = currentJobInfo;
+
+    const resultDiv = document.getElementById('aiAnalysisResult');
+    const btn = document.getElementById('logAIAnalyzeBtn');
+
+    resultDiv.style.display = 'block';
+    resultDiv.innerHTML = `
+        <div style="color: #0dcaf0;" id="aiStreamingHint">
+            <span class="spinner-border spinner-border-sm me-2" role="status"></span>
+            AI 正在分析构建日志...
+        </div>
+        <div id="aiStreamingContent" style="color:#e2e8f0;font-size:0.875rem;line-height:1.7;"></div>
+    `;
+    btn.disabled = true;
+
+    const contentDiv = document.getElementById('aiStreamingContent');
+    const hintDiv = document.getElementById('aiStreamingHint');
+    let fullText = '';
+
+    try {
+        const projectName = document.getElementById('topicHeader') ?
+            (document.querySelector('.topic-header-content h2') ?
+                document.querySelector('.topic-header-content h2').textContent.trim() : '') : '';
+
+        const resp = await fetch('/api/shuttle/log/' + jobId + '/analyze', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ arch: arch, project_name: projectName })
+        });
+
+        if (!resp.ok) {
+            const err = await resp.json().catch(() => ({}));
+            resultDiv.innerHTML = '<div style="color:#f87171;">AI 分析失败: ' + (err.message || 'HTTP ' + resp.status) + '</div>';
+            return;
+        }
+
+        const reader = resp.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = '';
+
+        while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+
+            buffer += decoder.decode(value, { stream: true });
+            const lines = buffer.split('\n');
+            buffer = lines.pop() || '';
+
+            for (const line of lines) {
+                if (!line.startsWith('data: ')) continue;
+                const data = line.slice(6);
+                if (data === '[DONE]') continue;
+
+                try {
+                    const parsed = JSON.parse(data);
+                    fullText += parsed.c || '';
+                } catch {
+                    fullText += data;
+                }
+                contentDiv.textContent = fullText;
+            }
+        }
+
+        // Streaming complete — render markdown
+        hintDiv.style.display = 'none';
+        const html = fullText
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/\n\n/g, '</p><p>')
+            .replace(/\n/g, '<br>')
+            .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+            .replace(/`([^`]+)`/g, '<code style="background:#0f172a;padding:2px 6px;border-radius:4px;">$1</code>');
+        contentDiv.innerHTML = '<p>' + html + '</p>';
+        resultDiv.scrollIntoView({ behavior: 'smooth' });
+
+    } catch (e) {
+        resultDiv.innerHTML = '<div style="color:#f87171;">请求失败: ' + e.message + '</div>';
+    } finally {
+        btn.disabled = false;
+    }
+}
+
+async function retryJobFromLog() {
+    if (!currentJobInfo) return;
+    const { jobId, arch, buildId } = currentJobInfo;
+
+    const confirmed = await customConfirm(
+        `确定要重试 ${arch} 架构的构建吗？`,
+        '重试架构构建',
+        'arrow-clockwise',
+        'warning'
+    );
+
+    if (!confirmed) return;
+
+    try {
+        const configResponse = await fetch('/config/api/config');
+        const configResult = await configResponse.json();
+
+        if (!configResult.success || !configResult.data.maintainer_name) {
+            showToast('未配置维护者姓名，请先在配置页面设置', 'error');
+            return;
+        }
+
+        const username = configResult.data.maintainer_name;
+
+        const response = await fetch('https://shuttle.uniontech.com/api/shuttle/job/rebuild', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ jobid: jobId, username: username })
+        });
+
+        const data = await response.json();
+
+        if (data.code === 0) {
+            showToast(`${arch} 架构重试成功`, 'success');
+            const modal = bootstrap.Modal.getInstance(document.getElementById('logViewerModal'));
+            if (modal) modal.hide();
+            loadArchStatus(buildId);
+        } else {
+            showToast(`重试失败: ${data.message}`, 'error');
+        }
+    } catch (e) {
+        showToast('请求失败: ' + e.message, 'error');
+    }
+}
+
+function copyBuildLog() {
+    if (!currentBuildLog) {
+        showToast('没有可复制的日志内容', 'warning');
+        return;
+    }
+    navigator.clipboard.writeText(currentBuildLog).then(() => {
+        showToast('日志已复制到剪贴板', 'success');
+    }).catch(() => {
+        showToast('复制失败，请手动选择复制', 'error');
+    });
+}
+
 </script>
 {% endblock %}

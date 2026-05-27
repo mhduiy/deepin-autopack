@@ -51,21 +51,44 @@ main {
 
 /* 表格样式 */
 .table {
-    font-size: 0.95rem;
+    font-size: 0.875rem;
+    margin: 0;
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
 }
 
 .table thead th {
     font-weight: 600;
-    color: #495057;
-    border-bottom: 2px solid #dee2e6;
+    color: #475569;
+    background: #f8fafc;
+    border-top: 1px solid #e2e8f0;
+    border-bottom: 2px solid #e2e8f0;
+    padding: 0.65rem 0.9rem;
+    font-size: 0.8rem;
+    text-transform: none;
+    letter-spacing: 0;
+    white-space: nowrap;
+    vertical-align: middle;
+}
+
+.table tbody td {
+    border-bottom: 1px solid #f1f5f9;
+    padding: 0.65rem 0.9rem;
+    vertical-align: middle;
+    color: #334155;
 }
 
 .table tbody tr {
-    transition: background-color 0.2s ease;
+    transition: background-color 0.15s ease;
 }
 
 .table tbody tr:hover {
-    background-color: #f8f9fa;
+    background-color: #f1f5f9;
+}
+
+.table tbody tr:last-child td {
+    border-bottom: none;
 }
 
 /* 按钮样式优化 */
@@ -203,35 +226,6 @@ code {
 
 ::-webkit-scrollbar-thumb:hover {
     background: #a8a8a8;
-}
-
-input[type="submit"]:hover {
-    background: #45a049;
-}
-
-.table {
-    width: 100%;
-    border-collapse: collapse;
-    margin: 20px 0;
-}
-
-.table th,
-.table td {
-    border: 1px solid #ddd;
-    padding: 8px;
-}
-
-.table th {
-    background-color: #35424a;
-    color: white;
-}
-
-.table tr:nth-child(even) {
-    background-color: #f2f2f2;
-}
-
-.table tr:hover {
-    background-color: #ddd;
 }
 
 /* 内联加载动画样式 */

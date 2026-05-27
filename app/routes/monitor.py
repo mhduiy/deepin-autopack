@@ -1,9 +1,10 @@
-from flask import Blueprint, render_template, request, jsonify
+from flask import Blueprint, render_template, request, jsonify, Response, stream_with_context
 from app.models import Project
 from app.services.repo_service import RepoService
 from app.services.changelog_service import ChangelogService
 from app import db
 import logging
+import json
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
@@ -436,3 +437,124 @@ def export_new_commits():
     except Exception as e:
         logger.error(f"导出失败: {str(e)}", exc_info=True)
         return jsonify({"success": False, "message": str(e)}), 500
+
+
+COMMIT_ANALYSIS_PROMPT = """你是 Deepin 软件包维护者。下面是一批项目的新增提交信息（格式：项目名 | hash | 作者 | 日期 | 提交信息），请做以下分析：
+
+1. **关联单据**：从所有提交信息中提取 BUG-xxxx、TASK-xxxx、STORY-xxx 编号，按项目分组列出，没有就写"无"
+
+2. **变更概述**：每个项目用 1-2 句话概括这批提交做了什么改动
+
+3. **打包建议**：判断哪些项目适合打包（有实质代码变更、bug修复、功能新增），哪些可以跳过（仅文档、CI配置、格式化等）
+
+请直接输出，不要寒暄。格式：
+## 关联单据
+- projectA: STORY-001, BUG-002
+- projectB: 无
+
+## 变更概述
+- projectA: 修复了xxx，新增了xxx
+- projectB: 更新了翻译文件
+
+## 打包建议
+建议打包: projectA (有bug修复)
+可跳过: projectB (仅翻译更新)"""
+
+
+@monitor_bp.route("/api/monitor/ai-analyze-commits", methods=["POST"])
+def ai_analyze_commits():
+    """AI 分析所有有新增提交的项目（流式输出，带指纹缓存）"""
+    from app.services.ai_service import AIService
+    from app.models import GlobalConfig
+    import hashlib
+
+    try:
+        data = request.get_json(silent=True) or {}
+        projects = data.get("projects", [])
+        force = data.get("force", False)
+
+        if not projects:
+            return jsonify({"success": False, "message": "没有提交数据"}), 400
+
+        # 构建紧凑文本 + 计算指纹
+        lines = []
+        hashes = []
+        for p in projects:
+            name = p.get("name", "")
+            commits = p.get("commits", [])
+            if not commits:
+                continue
+            for c in commits:
+                hashes.append(c.get("hash", ""))
+                lines.append(
+                    f"[{name}] {c.get('hash','')} | {c.get('author','')} | {c.get('date','')} | {c.get('message','')}"
+                )
+
+        fingerprint = hashlib.md5("|".join(sorted(hashes)).encode()).hexdigest()
+        commit_text = "\n".join(lines)
+
+        # 检查缓存
+        config = GlobalConfig.get_config()
+        if not force and config.ai_analysis_fingerprint == fingerprint and config.ai_analysis_result:
+            logger.info("AI 提交分析命中缓存，直接返回")
+            result = config.ai_analysis_result
+
+            def cached_generate():
+                # 模拟流式输出，每 50 个字符一块
+                for i in range(0, len(result), 50):
+                    yield f"data: {json.dumps({'c': result[i:i+50]})}\n\n"
+                yield "data: [DONE]\n\n"
+
+            return Response(
+                stream_with_context(cached_generate()),
+                mimetype="text/event-stream",
+                headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+            )
+
+        # 缓存未命中，调用 AI 分析
+        logger.info(f"AI 提交分析指纹不匹配 ({fingerprint[:8]}...)，开始分析")
+
+        def generate():
+            full_result = []
+            for chunk in AIService.analyze_stream(
+                commit_text, arch="", project_name="提交监控批量分析",
+                system_prompt=COMMIT_ANALYSIS_PROMPT
+            ):
+                full_result.append(chunk)
+                yield f"data: {json.dumps({'c': chunk})}\n\n"
+
+            # 分析完成，存入缓存
+            try:
+                result_text = "".join(full_result)
+                config.ai_analysis_fingerprint = fingerprint
+                config.ai_analysis_result = result_text
+                db.session.commit()
+                logger.info(f"AI 提交分析结果已缓存 (指纹: {fingerprint[:8]}...)")
+            except Exception as e:
+                logger.error(f"缓存 AI 分析结果失败: {e}")
+                db.session.rollback()
+
+            yield "data: [DONE]\n\n"
+
+        return Response(
+            stream_with_context(generate()),
+            mimetype="text/event-stream",
+            headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+        )
+
+    except Exception as e:
+        logger.exception(f"AI 分析提交失败: {e}")
+        return jsonify({"success": False, "message": str(e)}), 500
+
+
+@monitor_bp.route("/api/monitor/ai-analysis-cache", methods=["GET"])
+def ai_analysis_cache():
+    """检查 AI 分析缓存状态"""
+    from app.models import GlobalConfig
+    config = GlobalConfig.get_config()
+    return jsonify({
+        "success": True,
+        "fingerprint": config.ai_analysis_fingerprint or "",
+        "has_result": bool(config.ai_analysis_result),
+        "result": config.ai_analysis_result or "",
+    })

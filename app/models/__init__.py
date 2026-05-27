@@ -56,6 +56,11 @@ class GlobalConfig(db.Model):
     crp_topic_type = db.Column(db.String(50), default='test', comment='CRP主题类型')
     https_proxy = db.Column(db.String(200), comment='HTTPS代理配置')
     local_repos_dir = db.Column(db.String(500), default='/tmp/deepin-autopack-repos', comment='本地仓库存储目录')
+    ai_api_url = db.Column(db.String(500), comment='AI API地址 (OpenAI兼容)')
+    ai_api_key = db.Column(db.String(255), comment='AI API密钥')
+    ai_model = db.Column(db.String(100), comment='AI模型名称')
+    ai_analysis_fingerprint = db.Column(db.String(64), comment='提交分析指纹，用于缓存')
+    ai_analysis_result = db.Column(db.Text, comment='缓存的 AI 提交分析结果')
     updated_at = db.Column(db.DateTime, server_default=db.func.now(), onupdate=db.func.now())
     
     @classmethod
@@ -80,6 +85,10 @@ class GlobalConfig(db.Model):
             'has_ldap_password': bool(self.ldap_password),
             'has_github_token': bool(self.github_token),
             'has_crp_token': bool(self.crp_token),
+            'has_ai_api_key': bool(self.ai_api_key),
+            'ai_api_url': self.ai_api_url,
+            'ai_model': self.ai_model,
+            'ai_analysis_fingerprint': self.ai_analysis_fingerprint,
             'updated_at': self.updated_at.isoformat() if self.updated_at else None
         }
     

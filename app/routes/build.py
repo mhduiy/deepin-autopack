@@ -2,6 +2,7 @@
 打包任务路由
 """
 
+import json
 from flask import Blueprint, render_template, jsonify, request
 from app.services.build_task_service import BuildTaskService
 from app.models.build_task import BuildTask
@@ -456,4 +457,88 @@ def api_get_workflows(project_name):
         return jsonify({
             'success': False,
             'message': f'获取 workflows 失败: {str(e)}'
+        }), 500
+
+
+# ==================== Shuttle 构建日志 ====================
+
+@build_bp.route('/api/shuttle/log/<int:job_id>', methods=['GET'])
+def api_shuttle_log(job_id):
+    """获取 Shuttle 构建日志"""
+    from app.services.shuttle_service import ShuttleService
+
+    try:
+        log = ShuttleService.get_job_log(job_id)
+        if log is None:
+            return jsonify({
+                'success': False,
+                'message': '获取构建日志失败，请检查权限或稍后重试',
+                'shuttle_url': ShuttleService.get_build_url(job_id),
+            }), 502
+
+        return jsonify({
+            'success': True,
+            'data': log,
+            'shuttle_url': ShuttleService.get_build_url(job_id),
+        })
+
+    except Exception as e:
+        logger.exception(f"获取 shuttle 日志失败: {e}")
+        return jsonify({
+            'success': False,
+            'message': f'获取构建日志失败: {str(e)}'
+        }), 500
+
+
+@build_bp.route('/api/shuttle/log/<int:job_id>/analyze', methods=['POST'])
+def api_shuttle_log_analyze(job_id):
+    """AI 分析 Shuttle 构建日志（支持流式输出）"""
+    from flask import Response, stream_with_context
+    from app.services.shuttle_service import ShuttleService
+    from app.services.ai_service import AIService
+
+    try:
+        log = ShuttleService.get_job_log(job_id)
+        if log is None:
+            return jsonify({
+                'success': False,
+                'message': '获取构建日志失败，无法分析',
+            }), 502
+
+        data = request.get_json(silent=True) or {}
+        arch = data.get('arch', '')
+        project_name = data.get('project_name', '')
+        use_stream = request.args.get('stream', '1') == '1'
+
+        if not use_stream:
+            analysis = AIService.analyze(log, arch=arch, project_name=project_name)
+            if analysis is None:
+                return jsonify({
+                    'success': False,
+                    'message': 'AI 分析失败，请检查 AI 配置或稍后重试',
+                }), 502
+            return jsonify({
+                'success': True,
+                'data': analysis,
+            })
+
+        def generate():
+            for chunk in AIService.analyze_stream(log, arch=arch, project_name=project_name):
+                yield f"data: {json.dumps({'c': chunk})}\n\n"
+            yield "data: [DONE]\n\n"
+
+        return Response(
+            stream_with_context(generate()),
+            mimetype='text/event-stream',
+            headers={
+                'Cache-Control': 'no-cache',
+                'X-Accel-Buffering': 'no',
+            }
+        )
+
+    except Exception as e:
+        logger.exception(f"AI 分析失败: {e}")
+        return jsonify({
+            'success': False,
+            'message': f'AI 分析失败: {str(e)}'
         }), 500

@@ -22,12 +22,40 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 });
 
-// 工具函数：复制到剪贴板
+// 工具函数：复制到剪贴板（兼容非HTTPS环境）
 function copyToClipboard(text) {
-    navigator.clipboard.writeText(text).then(() => {
-        showToast('已复制到剪贴板', 'success');
-    }).catch(() => {
-        showToast('复制失败', 'danger');
+    return new Promise((resolve, reject) => {
+        // 优先使用 Clipboard API（需要 HTTPS 或 localhost）
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(text).then(() => {
+                resolve();
+            }).catch((err) => {
+                reject(err);
+            });
+        } else {
+            // Fallback: 使用 execCommand（兼容 HTTP）
+            const textarea = document.createElement('textarea');
+            textarea.value = text;
+            textarea.style.position = 'fixed';
+            textarea.style.left = '-9999px';
+            textarea.style.top = '-9999px';
+            document.body.appendChild(textarea);
+            textarea.focus();
+            textarea.select();
+            
+            try {
+                const successful = document.execCommand('copy');
+                document.body.removeChild(textarea);
+                if (successful) {
+                    resolve();
+                } else {
+                    reject(new Error('execCommand copy failed'));
+                }
+            } catch (err) {
+                document.body.removeChild(textarea);
+                reject(err);
+            }
+        }
     });
 }
 

@@ -146,6 +146,61 @@
                 </div>
             </div>
 
+            <!-- AI 配置 -->
+            <div class="config-card mb-4">
+                <div class="config-header">
+                    <div class="config-header-icon ai-icon">
+                        <i class="bi bi-robot"></i>
+                    </div>
+                    <div>
+                        <h5 class="mb-1">AI 配置</h5>
+                        <small class="text-muted">OpenAI 兼容接口，支持日志分析等 AI 功能</small>
+                    </div>
+                </div>
+                <div class="config-body">
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label for="ai_api_url" class="form-label">
+                                <i class="bi bi-link-45deg me-1"></i>API 地址
+                            </label>
+                            <input type="text"
+                                   class="form-control font-monospace"
+                                   id="ai_api_url"
+                                   name="ai_api_url"
+                                   value="{{ config.ai_api_url or '' }}"
+                                   placeholder="https://api.openai.com">
+                            <small class="form-text text-muted">OpenAI 兼容接口地址，也支持 DeepSeek、Ollama 等</small>
+                        </div>
+                        <div class="col-md-3">
+                            <label for="ai_model" class="form-label">
+                                <i class="bi bi-cpu me-1"></i>模型
+                            </label>
+                            <input type="text"
+                                   class="form-control"
+                                   id="ai_model"
+                                   name="ai_model"
+                                   value="{{ config.ai_model or '' }}"
+                                   placeholder="gpt-4o-mini">
+                            <small class="form-text text-muted">如 gpt-4o-mini、deepseek-chat</small>
+                        </div>
+                        <div class="col-md-3">
+                            <label for="ai_api_key" class="form-label">
+                                <i class="bi bi-key me-1"></i>API Key
+                                {% if config.ai_api_key %}
+                                    <span class="badge bg-success ms-2">已设置</span>
+                                {% endif %}
+                            </label>
+                            <input type="password"
+                                   class="form-control font-monospace"
+                                   id="ai_api_key"
+                                   name="ai_api_key"
+                                   placeholder="{% if config.ai_api_key %}留空则不修改{% else %}sk-...{% endif %}">
+                            <small class="form-text text-muted">留空则不修改已保存的 Key</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             <!-- CRP配置 -->
             <div class="config-card mb-4">
                 <div class="config-header">
@@ -305,7 +360,7 @@
                     <hr class="my-3">
 
                     <!-- Gerrit连接测试 -->
-                    <div class="test-item mb-0">
+                    <div class="test-item mb-3">
                         <div class="d-flex align-items-center mb-2">
                             <i class="bi bi-git text-danger me-2"></i>
                             <strong>Gerrit</strong>
@@ -327,6 +382,23 @@
                             <i class="bi bi-play-circle me-1"></i>测试 Gerrit 连接
                         </button>
                         <div id="gerritTestResult" class="test-result mt-2"></div>
+                    </div>
+
+                    <hr class="my-3">
+
+                    <!-- AI连接测试 -->
+                    <div class="test-item mb-0">
+                        <div class="d-flex align-items-center mb-2">
+                            <i class="bi bi-robot text-info me-2"></i>
+                            <strong>AI 接口</strong>
+                        </div>
+                        <button type="button"
+                                class="btn btn-outline-info btn-sm w-100"
+                                onclick="testAIConnection()"
+                                {% if not config.ai_api_url or not config.ai_api_key %}disabled{% endif %}>
+                            <i class="bi bi-play-circle me-1"></i>测试 AI 连接
+                        </button>
+                        <div id="aiTestResult" class="test-result mt-2"></div>
                     </div>
 
                     {% if not config.ldap_username or not config.ldap_password %}
@@ -391,6 +463,11 @@
 
 .crp-icon {
     background: linear-gradient(135deg, #11998e, #38ef7d);
+    color: white;
+}
+
+.ai-icon {
+    background: linear-gradient(135deg, #0dcaf0, #6f42c1);
     color: white;
 }
 
@@ -545,6 +622,27 @@ async function testGerritConnection() {
             resultDiv.innerHTML = '<small class="text-success"><i class="bi bi-check-circle me-1"></i>连接成功</small>';
         } else {
             resultDiv.innerHTML = `<small class="text-danger"><i class="bi bi-x-circle me-1"></i>${result.message}</small>`;
+        }
+    } catch (error) {
+        resultDiv.innerHTML = `<small class="text-danger"><i class="bi bi-x-circle me-1"></i>测试失败: ${error.message}</small>`;
+    }
+}
+
+// 测试AI连接
+async function testAIConnection() {
+    const resultDiv = document.getElementById('aiTestResult');
+    resultDiv.innerHTML = '<small class="text-muted"><i class="spinner-border spinner-border-sm me-1"></i>测试中...</small>';
+
+    try {
+        const response = await fetch('/config/test-ai', {
+            method: 'POST'
+        });
+        const result = await response.json();
+
+        if (result.success) {
+            resultDiv.innerHTML = '<small class="text-success"><i class="bi bi-check-circle me-1"></i>' + result.message + '</small>';
+        } else {
+            resultDiv.innerHTML = '<small class="text-danger"><i class="bi bi-x-circle me-1"></i>' + result.message + '</small>';
         }
     } catch (error) {
         resultDiv.innerHTML = `<small class="text-danger"><i class="bi bi-x-circle me-1"></i>测试失败: ${error.message}</small>`;

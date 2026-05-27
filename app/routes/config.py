@@ -16,7 +16,10 @@ def get_config_api():
             'ldap_username': config.ldap_username,
             'github_username': config.github_username,
             'maintainer_name': config.maintainer_name,
-            'maintainer_email': config.maintainer_email
+            'maintainer_email': config.maintainer_email,
+            'ai_api_url': config.ai_api_url,
+            'ai_model': config.ai_model,
+            'has_ai_api_key': bool(config.ai_api_key)
         }
     })
 
@@ -55,7 +58,14 @@ def global_config():
             crp_token = request.form.get('crp_token')
             if crp_token:
                 config.crp_token = crp_token
-            
+
+            # AI 配置
+            config.ai_api_url = request.form.get('ai_api_url') or None
+            config.ai_model = request.form.get('ai_model') or None
+            ai_api_key = request.form.get('ai_api_key')
+            if ai_api_key:
+                config.ai_api_key = ai_api_key
+
             db.session.commit()
             flash('全局配置已保存！', 'success')
             return redirect(url_for('config.global_config'))
@@ -175,3 +185,41 @@ def refresh_crp_token():
         return jsonify({'success': False, 'message': '刷新超时，请稍后重试'})
     except Exception as e:
         return jsonify({'success': False, 'message': f'刷新失败: {str(e)}'})
+
+
+@config_bp.route('/test-ai', methods=['POST'])
+def test_ai():
+    """测试 AI API 连接"""
+    import requests
+
+    config = GlobalConfig.get_config()
+
+    if not config.ai_api_url:
+        return jsonify({'success': False, 'message': '请先配置 AI API 地址'}), 400
+    if not config.ai_api_key:
+        return jsonify({'success': False, 'message': '请先配置 AI API Key'}), 400
+
+    try:
+        model = config.ai_model or 'gpt-4o-mini'
+        resp = requests.post(
+            f"{config.ai_api_url.rstrip('/')}/v1/chat/completions",
+            headers={
+                "Authorization": f"Bearer {config.ai_api_key}",
+                "Content-Type": "application/json",
+            },
+            json={
+                "model": model,
+                "messages": [{"role": "user", "content": "hi"}],
+                "max_tokens": 5,
+            },
+            timeout=15,
+        )
+        if resp.status_code == 200:
+            return jsonify({'success': True, 'message': f'AI 连接成功 (模型: {model})'})
+        else:
+            detail = resp.text[:200]
+            return jsonify({'success': False, 'message': f'API 返回 {resp.status_code}: {detail}'})
+    except requests.Timeout:
+        return jsonify({'success': False, 'message': '连接超时'})
+    except Exception as e:
+        return jsonify({'success': False, 'message': f'连接失败: {str(e)}'})

@@ -11,11 +11,6 @@ project_bp = Blueprint('project', __name__)
 # 配置日志
 logger = logging.getLogger(__name__)
 
-@project_bp.route('/')
-def index():
-    """首页 - 重定向到项目列表"""
-    return redirect(url_for('project.project_list'))
-
 @project_bp.route('/projects')
 def project_list():
     """项目列表页"""

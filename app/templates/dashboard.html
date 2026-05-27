@@ -1,0 +1,550 @@
+{% extends "base.html" %}
+{% block title %}主页看板 - Deepin 自动打包{% endblock %}
+
+{% block content %}
+<div class="container-fluid px-0">
+    <!-- 页面标题 -->
+    <div class="d-flex justify-content-between align-items-center mb-4 px-3">
+        <div>
+            <h2 class="fw-bold mb-1"><i class="bi bi-speedometer2 me-2 text-primary"></i>主页看板</h2>
+            <p class="text-muted mb-0">实时概览打包系统状态</p>
+        </div>
+        <div class="d-flex align-items-center gap-2">
+            <span class="text-muted small" id="refreshInfo">加载中...</span>
+            <button class="btn btn-outline-primary btn-sm" onclick="refreshAll()">
+                <i class="bi bi-arrow-clockwise me-1"></i>刷新
+            </button>
+        </div>
+    </div>
+
+    <!-- 统计卡片 -->
+    <div class="row g-3 mb-4 px-3" id="statsCards">
+        <div class="col-6 col-md-4 col-xl-2">
+            <div class="stat-card">
+                <div class="stat-icon bg-primary-light"><i class="bi bi-folder2-open text-primary"></i></div>
+                <div class="stat-body">
+                    <div class="stat-value" id="statTotalProjects">-</div>
+                    <div class="stat-label">项目总数</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-6 col-md-4 col-xl-2">
+            <div class="stat-card">
+                <div class="stat-icon bg-success-light"><i class="bi bi-check-circle text-success"></i></div>
+                <div class="stat-body">
+                    <div class="stat-value" id="statReadyProjects">-</div>
+                    <div class="stat-label">就绪项目</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-6 col-md-4 col-xl-2">
+            <div class="stat-card">
+                <div class="stat-icon bg-warning-light"><i class="bi bi-play-circle text-warning"></i></div>
+                <div class="stat-body">
+                    <div class="stat-value" id="statRunningTasks">-</div>
+                    <div class="stat-label">运行中任务</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-6 col-md-4 col-xl-2">
+            <div class="stat-card">
+                <div class="stat-icon bg-danger-light"><i class="bi bi-exclamation-triangle text-danger"></i></div>
+                <div class="stat-body">
+                    <div class="stat-value" id="statFailedTasks">-</div>
+                    <div class="stat-label">失败 / 待处理</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-6 col-md-4 col-xl-2">
+            <div class="stat-card clickable" onclick="document.getElementById('unmergedPRSection').scrollIntoView({behavior:'smooth'})">
+                <div class="stat-icon bg-info-light"><i class="bi bi-git-pull-request text-info"></i></div>
+                <div class="stat-body">
+                    <div class="stat-value" id="statUnmergedPRs">-</div>
+                    <div class="stat-label">未合并 PR</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-6 col-md-4 col-xl-2">
+            <div class="stat-card">
+                <div class="stat-icon bg-purple-light"><i class="bi bi-git text-purple"></i></div>
+                <div class="stat-body">
+                    <div class="stat-value" id="statNewCommits">-</div>
+                    <div class="stat-label">有新增提交</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 图表区 -->
+    <div class="row g-3 mb-4 px-3">
+        <div class="col-xl-8">
+            <div class="card dashboard-card chart-card">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="bi bi-bar-chart-line me-2"></i>近 7 天打包趋势</h5>
+                </div>
+                <div class="card-body">
+                    <canvas id="weeklyChart" height="260"></canvas>
+                </div>
+            </div>
+        </div>
+        <div class="col-xl-4">
+            <div class="card dashboard-card chart-card">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="bi bi-pie-chart me-2"></i>任务状态分布</h5>
+                </div>
+                <div class="card-body d-flex align-items-center">
+                    <canvas id="statusChart" height="260"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 主体内容双栏 -->
+    <div class="row g-3 mb-4 px-3">
+        <div class="col-xl-7">
+            <div class="card dashboard-card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0"><i class="bi bi-list-task me-2"></i>最近打包任务</h5>
+                    <a href="{{ url_for('build.tasks') }}" class="btn btn-sm btn-outline-primary">查看全部 <i class="bi bi-arrow-right"></i></a>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-hover mb-0">
+                            <thead>
+                                <tr>
+                                    <th>项目</th>
+                                    <th>版本</th>
+                                    <th>模式</th>
+                                    <th>状态</th>
+                                    <th>步骤</th>
+                                    <th>创建时间</th>
+                                </tr>
+                            </thead>
+                            <tbody id="recentTasksBody">
+                                <tr>
+                                    <td colspan="6" class="text-center py-4 text-muted">
+                                        <div class="spinner-border spinner-border-sm me-2" role="status"></div>
+                                        加载中...
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-xl-5">
+            <div class="card dashboard-card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0"><i class="bi bi-git me-2"></i>有新增提交的项目</h5>
+                    <a href="{{ url_for('monitor.monitor') }}" class="btn btn-sm btn-outline-primary">提交监控 <i class="bi bi-arrow-right"></i></a>
+                </div>
+                <div class="card-body p-0" style="max-height: 500px; overflow-y: auto;">
+                    <div id="newCommitsList">
+                        <div class="text-center py-4 text-muted">
+                            <div class="spinner-border spinner-border-sm me-2" role="status"></div>
+                            加载中...
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 未合并 PR 列表 -->
+    <div class="row g-3 px-3">
+        <div class="col-12">
+            <div class="card dashboard-card" id="unmergedPRSection" style="display:none;">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0"><i class="bi bi-git-pull-request me-2"></i>未合并 PR <span class="badge bg-warning ms-1" id="unmergedPRBadge">0</span></h5>
+                    <a href="{{ url_for('build.tasks') }}" class="btn btn-sm btn-outline-primary">查看任务 <i class="bi bi-arrow-right"></i></a>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-hover mb-0">
+                            <thead>
+                                <tr>
+                                    <th>项目</th>
+                                    <th>版本</th>
+                                    <th>PR</th>
+                                    <th>PR 状态</th>
+                                    <th>任务状态</th>
+                                    <th>创建时间</th>
+                                </tr>
+                            </thead>
+                            <tbody id="unmergedPRBody">
+                                <tr><td colspan="6" class="text-center py-3 text-muted">加载中...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<!-- Chart.js -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+
+<style>
+    .stat-card {
+        background: white;
+        border-radius: 14px;
+        padding: 1.25rem;
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+        transition: all 0.2s ease;
+        height: 100%;
+    }
+    .stat-card.clickable { cursor: pointer; }
+    .stat-card.clickable:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(0,0,0,0.1); }
+    .stat-icon {
+        width: 48px; height: 48px;
+        border-radius: 12px;
+        display: flex; align-items: center; justify-content: center;
+        font-size: 1.4rem; flex-shrink: 0;
+    }
+    .stat-value { font-size: 1.6rem; font-weight: 700; line-height: 1.2; color: #1f2937; }
+    .stat-label { font-size: 0.8rem; color: #6b7280; margin-top: 2px; }
+
+    .bg-primary-light { background: #eff6ff; }
+    .bg-success-light { background: #ecfdf5; }
+    .bg-warning-light { background: #fffbeb; }
+    .bg-danger-light { background: #fef2f2; }
+    .bg-info-light { background: #eff6ff; }
+    .bg-purple-light { background: #f5f3ff; }
+    .text-purple { color: #7c3aed !important; }
+
+    .dashboard-card {
+        border: none; border-radius: 14px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+        overflow: hidden; height: 100%;
+    }
+    .dashboard-card .card-header {
+        background: white; border-bottom: 1px solid #f3f4f6;
+        padding: 1rem 1.25rem;
+    }
+    .dashboard-card .card-header h5 { font-size: 0.95rem; font-weight: 600; }
+    .chart-card .card-body { padding: 1rem 1.25rem; }
+
+    .status-badge {
+        font-size: 0.75rem; padding: 0.25em 0.6em;
+        border-radius: 20px; font-weight: 500; white-space: nowrap;
+    }
+    .status-running { background: #fef3c7; color: #92400e; }
+    .status-pending { background: #f3f4f6; color: #374151; }
+    .status-success { background: #d1fae5; color: #065f46; }
+    .status-failed  { background: #fee2e2; color: #991b1b; }
+    .status-paused  { background: #e0e7ff; color: #3730a3; }
+    .status-cancelled { background: #f3f4f6; color: #6b7280; }
+
+    .mode-badge {
+        font-size: 0.7rem; padding: 0.15em 0.5em;
+        border-radius: 4px; background: #f3f4f6; color: #6b7280;
+    }
+
+    .commit-item {
+        padding: 0.85rem 1.25rem;
+        border-bottom: 1px solid #f9fafb;
+        transition: background 0.15s ease;
+    }
+    .commit-item:last-child { border-bottom: none; }
+    .commit-item:hover { background: #f9fafb; }
+    .commit-count {
+        display: inline-flex; align-items: center; justify-content: center;
+        min-width: 26px; height: 26px; border-radius: 20px;
+        font-size: 0.75rem; font-weight: 600;
+    }
+    .commit-count-high { background: #fee2e2; color: #991b1b; }
+    .commit-count-mid { background: #fef3c7; color: #92400e; }
+    .commit-count-low { background: #d1fae5; color: #065f46; }
+
+    .empty-state {
+        text-align: center; padding: 2.5rem 1rem; color: #9ca3af;
+    }
+    .empty-state i { font-size: 2.5rem; display: block; margin-bottom: 0.75rem; }
+
+    .table td, .table th { vertical-align: middle; font-size: 0.85rem; }
+    .table td { white-space: nowrap; }
+    .table td.text-wrap { white-space: normal; min-width: 200px; }
+</style>
+
+<script>
+    const REFRESH_MS = 60000; // 核心数据 60s 刷新
+    const SLOW_REFRESH_MS = 300000; // 慢数据 5min 刷新
+    let weeklyChart = null;
+    let statusChart = null;
+    let refreshTimer = null;
+
+    const statusMap = {
+        'running':   { cls: 'status-running',   label: '运行中' },
+        'pending':   { cls: 'status-pending',   label: '等待中' },
+        'success':   { cls: 'status-success',   label: '成功' },
+        'failed':    { cls: 'status-failed',    label: '失败' },
+        'paused':    { cls: 'status-paused',    label: '已暂停' },
+        'cancelled': { cls: 'status-cancelled', label: '已取消' }
+    };
+    const modeMap = { 'normal': '完整', 'changelog_only': 'Changelog', 'crp_only': 'CRP', 'github_action': 'Action' };
+
+    function formatTime(isoStr) {
+        if (!isoStr) return '-';
+        const d = new Date(isoStr), now = new Date(), diff = now - d;
+        if (diff < 60000) return '刚刚';
+        if (diff < 3600000) return Math.floor(diff / 60000) + '分钟前';
+        if (diff < 86400000) return Math.floor(diff / 3600000) + '小时前';
+        return d.toLocaleDateString('zh-CN', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+    }
+
+    function statusBadge(s) {
+        const m = statusMap[s] || { cls: 'status-pending', label: s };
+        return `<span class="status-badge ${m.cls}">${m.label}</span>`;
+    }
+
+    function escapeHtml(str) {
+        const div = document.createElement('div');
+        div.textContent = str || '';
+        return div.innerHTML;
+    }
+
+    // ============ 快速数据：仅DB查询 ============
+    async function loadSummary() {
+        try {
+            const resp = await fetch('/api/dashboard/summary');
+            const json = await resp.json();
+            if (!json.success) return;
+
+            const stats = json.data.stats;
+            document.getElementById('statTotalProjects').textContent = stats.total_projects;
+            document.getElementById('statReadyProjects').textContent = stats.ready_projects;
+            document.getElementById('statRunningTasks').textContent = stats.running_tasks;
+            document.getElementById('statFailedTasks').textContent = stats.failed_tasks + ' / ' + stats.pending_tasks;
+            document.getElementById('statUnmergedPRs').textContent = '...';
+            document.getElementById('statNewCommits').textContent = '...';
+
+            // 更新任务状态饼图
+            updateStatusChart(stats);
+
+            // 渲染最近任务
+            renderRecentTasks(json.data.recent_tasks);
+        } catch (e) {
+            console.error('loadSummary failed:', e);
+        }
+    }
+
+    function renderRecentTasks(tasks) {
+        const tbody = document.getElementById('recentTasksBody');
+        if (!tasks || !tasks.length) {
+            tbody.innerHTML = `<tr><td colspan="6"><div class="empty-state"><i class="bi bi-inbox"></i><p class="mb-0">暂无打包任务</p></div></td></tr>`;
+            return;
+        }
+        tbody.innerHTML = tasks.map(t => `
+            <tr style="cursor:pointer" onclick="window.open('/tasks','_self')">
+                <td><strong>${escapeHtml(t.project_name)}</strong></td>
+                <td><code>${escapeHtml(t.version)}</code></td>
+                <td><span class="mode-badge">${modeMap[t.mode] || t.mode}</span></td>
+                <td>${statusBadge(t.status)}</td>
+                <td class="text-muted small">第 ${t.current_step || 0} 步</td>
+                <td class="text-muted small">${formatTime(t.created_at)}</td>
+            </tr>
+        `).join('');
+    }
+
+    // ============ 图表 ============
+    function updateStatusChart(stats) {
+        const ctx = document.getElementById('statusChart').getContext('2d');
+        if (statusChart) statusChart.destroy();
+        statusChart = new Chart(ctx, {
+            type: 'doughnut',
+            data: {
+                labels: ['运行中', '等待中', '成功', '失败', '已暂停', '已取消'],
+                datasets: [{
+                    data: [stats.running_tasks, stats.pending_tasks, stats.success_tasks, stats.failed_tasks, stats.paused_tasks, stats.cancelled_tasks],
+                    backgroundColor: ['#f59e0b', '#94a3b8', '#10b981', '#ef4444', '#6366f1', '#9ca3af'],
+                    borderWidth: 2,
+                    borderColor: '#fff',
+                    hoverBorderWidth: 3,
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'bottom',
+                        labels: { padding: 16, usePointStyle: true, pointStyleWidth: 8, font: { size: 11 } }
+                    }
+                },
+                cutout: '60%',
+            }
+        });
+    }
+
+    async function loadWeeklyChart() {
+        try {
+            const resp = await fetch('/api/dashboard/weekly-stats');
+            const json = await resp.json();
+            if (!json.success) return;
+
+            const d = json.data;
+            const ctx = document.getElementById('weeklyChart').getContext('2d');
+            if (weeklyChart) weeklyChart.destroy();
+            weeklyChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: d.labels,
+                    datasets: [
+                        {
+                            label: '成功',
+                            data: d.successes,
+                            backgroundColor: 'rgba(16, 185, 129, 0.7)',
+                            borderColor: '#10b981',
+                            borderWidth: 1,
+                            borderRadius: 4,
+                        },
+                        {
+                            label: '失败/取消',
+                            data: d.failures,
+                            backgroundColor: 'rgba(239, 68, 68, 0.7)',
+                            borderColor: '#ef4444',
+                            borderWidth: 1,
+                            borderRadius: 4,
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    interaction: { mode: 'index', intersect: false },
+                    plugins: {
+                        legend: {
+                            position: 'bottom',
+                            labels: { usePointStyle: true, padding: 16, font: { size: 11 } }
+                        }
+                    },
+                    scales: {
+                        x: { stacked: true, grid: { display: false }, ticks: { font: { size: 11 } } },
+                        y: { stacked: true, beginAtZero: true, ticks: { stepSize: 1, font: { size: 11 } }, grid: { color: '#f1f5f9' } }
+                    }
+                }
+            });
+        } catch (e) {
+            console.error('loadWeeklyChart failed:', e);
+        }
+    }
+
+    // ============ 慢数据：git + GitHub API ============
+    async function loadNewCommits() {
+        try {
+            const resp = await fetch('/api/monitor/data-parallel');
+            const json = await resp.json();
+            if (!json.success) return;
+            const all = json.data || [];
+            const withCommits = all.filter(p => p.new_commits_count > 0);
+            document.getElementById('statNewCommits').textContent = withCommits.length;
+
+            const container = document.getElementById('newCommitsList');
+            if (!withCommits.length) {
+                container.innerHTML = `<div class="empty-state"><i class="bi bi-check-circle"></i><p class="mb-0">所有项目代码已同步</p></div>`;
+                return;
+            }
+            container.innerHTML = withCommits.sort((a,b) => b.new_commits_count - a.new_commits_count).map(p => {
+                const count = p.new_commits_count;
+                let cls = count > 10 ? 'commit-count-high' : count > 3 ? 'commit-count-mid' : 'commit-count-low';
+                const msg = p.new_commits && p.new_commits[0] ? escapeHtml(p.new_commits[0].message || '') : '';
+                const hash = p.latest_commit ? escapeHtml(p.latest_commit.hash || '').substring(0,8) : '';
+                return `
+                <div class="commit-item d-flex align-items-center gap-3">
+                    <span class="commit-count ${cls} flex-shrink-0">${count}</span>
+                    <div class="flex-grow-1 min-w-0">
+                        <div class="d-flex justify-content-between align-items-center mb-1">
+                            <strong class="text-truncate me-2">${escapeHtml(p.project.name)}</strong>
+                            <small class="text-muted flex-shrink-0">${escapeHtml(p.current_version || '-')}</small>
+                        </div>
+                        <div class="d-flex justify-content-between align-items-center">
+                            <small class="text-muted text-truncate me-2" title="${msg}">${msg || '无提交信息'}</small>
+                            <code class="small flex-shrink-0">${hash}</code>
+                        </div>
+                    </div>
+                </div>`;
+            }).join('');
+        } catch (e) {
+            console.error('loadNewCommits failed:', e);
+        }
+    }
+
+    async function loadUnmergedPRs() {
+        try {
+            const resp = await fetch('/api/tasks/unmerged-prs');
+            const json = await resp.json();
+            if (!json.success) return;
+            const prs = json.data || [];
+            document.getElementById('statUnmergedPRs').textContent = prs.length;
+
+            const section = document.getElementById('unmergedPRSection');
+            const badge = document.getElementById('unmergedPRBadge');
+            const tbody = document.getElementById('unmergedPRBody');
+
+            if (!prs.length) {
+                section.style.display = 'none';
+                return;
+            }
+            section.style.display = '';
+            badge.textContent = prs.length;
+            tbody.innerHTML = prs.map(p => `
+                <tr>
+                    <td><strong>${escapeHtml(p.project_name)}</strong></td>
+                    <td><code>${escapeHtml(p.version)}</code></td>
+                    <td><a href="${escapeHtml(p.pr_url)}" target="_blank" class="small">#${p.pr_number} <i class="bi bi-box-arrow-up-right"></i></a></td>
+                    <td>${statusBadge(p.pr_status === 'open' ? 'running' : 'pending')}</td>
+                    <td>${statusBadge(p.task_status)}</td>
+                    <td class="text-muted small">${formatTime(p.created_at)}</td>
+                </tr>
+            `).join('');
+        } catch (e) {
+            console.error('loadUnmergedPRs failed:', e);
+        }
+    }
+
+    // ============ 刷新控制 ============
+    async function refreshAll() {
+        document.getElementById('refreshInfo').textContent = '刷新中...';
+        await Promise.all([
+            loadSummary(),
+            loadWeeklyChart(),
+            loadNewCommits(),
+            loadUnmergedPRs(),
+        ]);
+        const now = new Date();
+        document.getElementById('refreshInfo').textContent = '已更新 ' + now.toLocaleTimeString('zh-CN', { hour:'2-digit', minute:'2-digit', second:'2-digit' });
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+        refreshAll();
+        // 快速数据 60s 刷新
+        refreshTimer = setInterval(() => {
+            loadSummary();
+            loadWeeklyChart();
+        }, REFRESH_MS);
+        // 慢数据 5min 刷新
+        setInterval(() => {
+            loadNewCommits();
+            loadUnmergedPRs();
+        }, SLOW_REFRESH_MS);
+    });
+
+    // 页面不可见时暂停
+    document.addEventListener('visibilitychange', () => {
+        if (document.hidden) {
+            clearInterval(refreshTimer);
+            refreshTimer = null;
+        } else {
+            refreshAll();
+            refreshTimer = setInterval(() => { loadSummary(); loadWeeklyChart(); }, REFRESH_MS);
+        }
+    });
+</script>
+{% endblock %}

@@ -412,6 +412,12 @@
         <!-- 导航菜单 -->
         <nav class="sidebar-nav">
             <div class="nav-item">
+                <a class="nav-link {% if request.endpoint == 'dashboard.index' %}active{% endif %}" href="{{ url_for('dashboard.index') }}">
+                    <i class="bi bi-speedometer2"></i>
+                    <span class="nav-link-text">主页看板</span>
+                </a>
+            </div>
+            <div class="nav-item">
                 <a class="nav-link {% if request.endpoint == 'project.project_list' %}active{% endif %}" href="{{ url_for('project.project_list') }}">
                     <i class="bi bi-folder2-open"></i>
                     <span class="nav-link-text">项目管理</span>

@@ -1460,8 +1460,9 @@ function renderPRList(prList) {
 }
 
 // 复制单个PR链接
-function copySinglePR(url, button) {
-    navigator.clipboard.writeText(url).then(() => {
+async function copySinglePR(url, button) {
+    try {
+        await copyToClipboard(url);
         const originalHTML = button.innerHTML;
         button.innerHTML = '<i class="bi bi-check"></i> 已复制';
         button.classList.add('copied');
@@ -1470,10 +1471,10 @@ function copySinglePR(url, button) {
             button.innerHTML = originalHTML;
             button.classList.remove('copied');
         }, 2000);
-    }).catch(err => {
+    } catch (err) {
         console.error('复制失败:', err);
         showToast('复制失败', 'error');
-    });
+    }
 }
 
 // 一键复制所有PR链接
@@ -1492,7 +1493,7 @@ async function copyAllPRs() {
             return `【${pr.project_name}】 v${pr.version} - #${pr.pr_number}\n${pr.pr_url}`;
         }).join('\n\n');
         
-        await navigator.clipboard.writeText(prText);
+        await copyToClipboard(prText);
         
         // 显示复制成功的反馈
         const feedback = document.querySelector('.copy-feedback');
