@@ -56,7 +56,7 @@ AI: 好的，我来为你打包 dde-shell 项目。
 📦 项目：dde-shell
 🔖 版本：20260307120000
 🗂️  CRP仓库：最新CRP仓库
-🏗️  架构：amd64, arm64, loongarch64
+🏗️  架构：amd64, arm64, loong64, sw64, mips64el
 
 🔗 查看进度：http://localhost:5000/build/tasks#123
 ```

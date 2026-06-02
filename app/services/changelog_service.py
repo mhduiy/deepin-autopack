@@ -87,6 +87,63 @@ class ChangelogService:
         return None
     
     @staticmethod
+    def bump_version(repo_path: str) -> Optional[str]:
+        """
+        从 debian/changelog 读取当前版本号并自动 +1（patch 位递增）
+
+        支持格式:
+          - 6.0.30      → 6.0.31
+          - 6.0.30-1    → 6.0.31
+          - 1:6.0.30    → 1:6.0.31
+          - 1:6.0.30-1  → 1:6.0.31
+
+        Args:
+            repo_path: 仓库路径
+
+        Returns:
+            递增后的版本号字符串，失败返回 None
+        """
+        import re as _re
+        current = ChangelogService.get_current_version(repo_path)
+        if not current:
+            return None
+
+        try:
+            epoch = ""
+            version_str = current
+
+            # 处理 epoch (如 1:6.0.30)
+            if ":" in version_str:
+                epoch_part, version_str = version_str.split(":", 1)
+                if epoch_part.isdigit():
+                    epoch = epoch_part + ":"
+
+            # 去掉 debian revision (如 6.0.30-1 → 6.0.30)
+            if "-" in version_str:
+                version_str = version_str.rsplit("-", 1)[0]
+
+            # 按 . 拆分并递增最后一位
+            parts = version_str.split(".")
+            if len(parts) < 2:
+                logger.warning(f"版本格式不支持自动递增: {current}")
+                return None
+
+            # 验证每个部分都是数字
+            for p in parts:
+                if not p.isdigit():
+                    logger.warning(f"版本号含非数字部分，不支持自动递增: {current}")
+                    return None
+
+            parts[-1] = str(int(parts[-1]) + 1)
+            new_version = epoch + ".".join(parts)
+            logger.info(f"版本自动递增: {current} → {new_version}")
+            return new_version
+
+        except Exception as e:
+            logger.warning(f"版本递增失败 ({current}): {e}")
+            return None
+
+    @staticmethod
     def get_changelog_info(repo_path: str) -> Dict[str, any]:
         """
         获取 changelog 完整信息

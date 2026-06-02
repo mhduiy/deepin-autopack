@@ -163,8 +163,20 @@ def packages_create():
             return jsonify({"success": False, "message": f"项目仓库未就绪: {project.repo_status}"}), 400
 
         mode = data.get("mode", "normal")
-        version = data.get("version") or datetime.now().strftime("%Y%m%d%H%M%S")
-        architectures = data.get("architectures", ["amd64", "arm64", "loongarch64"])
+        version = data.get("version")
+        if not version:
+            version = ChangelogService.bump_version(project.local_repo_path)
+            if not version:
+                current = ChangelogService.get_current_version(project.local_repo_path) if project.local_repo_path else None
+                return jsonify({
+                    "success": False,
+                    "message": (
+                        f"无法自动生成版本号。"
+                        f"当前 changelog 版本: {current or '未知'}。"
+                        f"请手动指定 version 参数。"
+                    )
+                }), 400
+        architectures = data.get("architectures", ["amd64", "arm64", "loong64", "sw64", "mips64el"])
 
         # 获取 CRP 主题
         crp_topic_id = data.get("crp_topic_id")

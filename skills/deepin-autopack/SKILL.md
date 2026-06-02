@@ -16,6 +16,12 @@ API 基础地址: `http://localhost:5000/api/v1`
 2. **别看源码**: 不要读取 `/home/ut005580@uos/Dev/deepin-autopack/` 下的任何源文件
 3. **不要直接操作数据库**: 不要导入 Flask app 或直接操作 SQLAlchemy
 4. **字段名以实际 API 返回为准**: 本文档列出的字段名是实际 API 返回的字段
+5. **默认架构**: 不指定架构时使用 `amd64`, `arm64`, `loong64`, `sw64`, `mips64el`
+6. **自动选择最新 CRP 主题**: 用户没有明确指定 CRP 主题时，自动选择最新的（列表第一个）
+7. **必须返回 PR 链接**: 创建打包任务后，必须轮询状态直到获取 `github_pr_url`，并将 PR 链接告知用户
+8. **Changelog PR 需手动合并**: `normal` 和 `changelog_only` 模式会产生 changelog PR，**必须提醒用户去审核并手动合并该 PR**，合并后系统会自动继续后续打包步骤。`crp_only` 和 `github_action` 模式不需要此步骤。告知用户后续可通过 `GET /api/v1/packages/<id>/status` 查询状态
+9. **告知版本号**: 创建打包任务时，**必须将版本号告知用户**（无论自动生成还是用户指定），让用户明确知道本次打包使用的版本
+10. **不要暴露内部地址**: 回复用户时**禁止**暴露内部 IP、`localhost`、内网 URL（如 `http://localhost:5000`、shuttle 内部地址等）。API 调用在内部完成，但对用户只展示公开可访问的链接（如 GitHub PR 链接、CRP 公开页面等）
 
 ---
 
@@ -126,10 +132,10 @@ curl -s -X POST http://localhost:5000/api/v1/packages/create \
 
 参数:
 - `project_name` (必填) - 项目名
-- `version` - 版本号（默认时间戳）
-- `architectures` - 架构列表（默认 `["amd64", "arm64", "loongarch64"]`）
+- `version` - 版本号（**不指定则自动从 debian/changelog 读取当前版本并 patch+1**，无法自动生成时会报错提示用户手动指定）
+- `architectures` - 架构列表（默认 `["amd64", "arm64", "loong64", "sw64", "mips64el"]`）
 - `mode` - `normal`(默认) / `changelog_only` / `crp_only` / `github_action`
-- `crp_topic_id` + `crp_topic_name` - 指定 CRP 主题（默认取最新）
+- `crp_topic_id` + `crp_topic_name` - 指定 CRP 主题（**不指定则自动选择最新的 CRP 主题**）
 
 返回:
 ```json
@@ -140,13 +146,28 @@ curl -s -X POST http://localhost:5000/api/v1/packages/create \
     "project_name": "dde-shell",
     "version": "20260527120000",
     "mode": "normal",
-    "architectures": ["amd64", "arm64", "loongarch64"],
+    "architectures": ["amd64", "arm64", "loong64", "sw64", "mips64el"],
     "crp_topic_name": "V26开发仓库",
     "status": "running"
   },
   "message": "打包任务已创建并启动: dde-shell v20260527120000"
 }
 ```
+
+**重要:** 创建打包任务后，需要做两件事：
+1. **立即告知用户版本号**（自动生成的或用户指定的），让用户知道打包用的是哪个版本
+2. **必须**轮询 `/api/v1/packages/<id>/status` 直到获取到 `github_pr_url`，然后将 PR 链接告知用户
+
+**当轮询到 `github_pr_url` 后，按打包模式告知用户：**
+
+- **`normal` / `changelog_only` 模式**: 必须提醒用户去审核 changelog PR 并手动合并：
+
+  > 📦 打包版本: **<version>**
+  > 🔗 Changelog PR: <github_pr_url>
+  > ⚠️ 请审核 changelog PR 并**手动合并**，合并后我会自动完成后续的打包步骤。
+  > 📊 随时可通过 `GET /api/v1/packages/<id>/status` 查询当前打包状态。
+
+- **`crp_only` / `github_action` 模式**: 直接告知版本和 PR 链接即可，无需手动合并。
 
 ### 查询任务状态
 
@@ -400,9 +421,15 @@ curl -s -X POST http://localhost:5000/api/v1/ai/analyze-commits \
 
 ```
 1. POST /api/v1/packages/create {"project_name": "dde-shell"}
-2. 每 30 秒 GET /api/v1/packages/<id>/status 直到 completed/failed
-3. 成功 → 报告 PR 链接和 CRP 链接
-   失败 → 查看 error_message，尝试 retry 或报告给用户
+2. 每 30 秒 GET /api/v1/packages/<id>/status 直到获取到 github_pr_url 或任务结束
+3. 获取到 PR 链接后:
+   - normal/changelog_only → 将版本号和 PR 链接发给用户，提醒审核并手动合并 changelog PR
+     "📦 打包版本: 6.0.31
+      🔗 Changelog PR: https://github.com/..."
+     "请审核 changelog PR 并手动合并，合并后我会自动完成后续打包步骤。
+      随时通过 GET /api/v1/packages/<id>/status 查询状态。"
+   - crp_only/github_action → 直接告知版本号和 PR 链接即可
+4. 任务失败 → 查看 error_message，尝试 retry 或报告给用户
 ```
 
 ---
@@ -414,8 +441,8 @@ curl -s -X POST http://localhost:5000/api/v1/ai/analyze-commits \
 | "检查有没有需要打包的项目" | `GET /api/v1/monitor/status` |
 | "有哪些项目有新增提交" | `GET /api/v1/monitor/projects` |
 | "帮我分析下新增了什么" | `POST /api/v1/ai/analyze-commits` |
-| "打包 dde-shell" | `POST /api/v1/packages/create {"project_name":"dde-shell"}` |
-| "打包 deepin-music 版本 6.0.30" | `POST /api/v1/packages/create {"project_name":"deepin-music","version":"6.0.30"}` |
+| "打包 dde-shell" | `POST /api/v1/packages/create` → 轮询 status 直到获取 PR 链接 → **normal/changelog_only 模式提醒用户审核并手动合并 PR** |
+| "打包 deepin-music 版本 6.0.30" | `POST /api/v1/packages/create` → 轮询 status → **按模式提醒用户（normal 需手动合并 PR）** |
 | "查询任务 123 的状态" | `GET /api/v1/packages/123/status` |
 | "重试任务 123" | `POST /api/v1/packages/123/retry` |
 | "有哪些项目可以打包" | `GET /api/v1/projects` |
